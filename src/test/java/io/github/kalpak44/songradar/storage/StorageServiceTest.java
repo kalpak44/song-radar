@@ -26,7 +26,7 @@ class StorageServiceTest {
   @BeforeEach
   void setUp() {
     settings = mock(StorageSettingsRepository.class);
-    service = new StorageService(root, settings);
+    service = new StorageService(root, BigDecimal.ZERO, settings);
   }
 
   @Test
@@ -51,6 +51,20 @@ class StorageServiceTest {
     StorageSnapshot snapshot = service.snapshot();
 
     assertEquals(snapshot.totalBytes(), snapshot.limitBytes());
+  }
+
+  @Test
+  void logicalCapacityIgnoresTheBackingFilesystemSize() throws Exception {
+    Files.write(root.resolve("song.mp3"), new byte[11]);
+    when(settings.findLimitBytes()).thenReturn(Optional.empty());
+    service = new StorageService(root, new BigDecimal("30"), settings);
+
+    StorageSnapshot snapshot = service.snapshot();
+
+    assertEquals(30_000_000_000L, snapshot.totalBytes());
+    assertEquals(11, snapshot.usedBytes());
+    assertEquals(29_999_999_989L, snapshot.availableBytes());
+    assertTrue(snapshot.logicalCapacity());
   }
 
   @Test
@@ -97,7 +111,8 @@ class StorageServiceTest {
   @Test
   void snapshotWrapsFilesystemFailures() throws Exception {
     Path fileInsteadOfDirectory = Files.writeString(root.resolve("not-a-directory"), "x");
-    StorageService invalidRoot = new StorageService(fileInsteadOfDirectory, settings);
+    StorageService invalidRoot =
+        new StorageService(fileInsteadOfDirectory, BigDecimal.ZERO, settings);
 
     UncheckedIOException failure = assertThrows(UncheckedIOException.class, invalidRoot::snapshot);
 

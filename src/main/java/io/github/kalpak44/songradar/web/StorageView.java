@@ -9,6 +9,7 @@ import java.util.Locale;
 /** Presentation-ready storage metrics plus raw values used by the range input. */
 public record StorageView(
     String path,
+    String capacityDescription,
     String total,
     String used,
     String available,
@@ -28,6 +29,9 @@ public record StorageView(
   public static StorageView of(StorageSnapshot snapshot) {
     return new StorageView(
         snapshot.path().toString(),
+        snapshot.logicalCapacity()
+            ? "Logical capacity configured for this SongRadar volume."
+            : "Capacity is read directly from the filesystem.",
         formatBytes(snapshot.totalBytes()),
         formatBytes(snapshot.usedBytes()),
         formatBytes(snapshot.availableBytes()),

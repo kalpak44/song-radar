@@ -40,7 +40,9 @@
                 </div>
                 <div class="min-w-0 flex-1">
                     <h2 class="text-base font-semibold">Mounted volume</h2>
-                    <p class="mt-0.5 text-sm text-slate-400">Capacity is read directly from the filesystem.</p>
+                    <p class="mt-0.5 text-sm text-slate-400" th:text="${storage.capacityDescription}">
+                        Capacity is read directly from the filesystem.
+                    </p>
                 </div>
             </div>
 

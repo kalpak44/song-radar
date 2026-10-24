@@ -19,7 +19,8 @@ class StorageViewTest {
                 35_000_000_000L,
                 65_000_000_000L,
                 12_000_000_000L,
-                20_000_000_000L));
+                20_000_000_000L,
+                true));
 
     assertEquals("100 GB", view.total());
     assertEquals("35.0 GB", view.used());
@@ -27,6 +28,8 @@ class StorageViewTest {
     assertEquals("12.0", view.songRadarPercent());
     assertEquals("23.0", view.otherUsedPercent());
     assertEquals("20.0", view.limitPercent());
+    assertEquals(
+        "Logical capacity configured for this SongRadar volume.", view.capacityDescription());
   }
 
   @Test
@@ -39,7 +42,8 @@ class StorageViewTest {
                 500_000_000_000L,
                 1_500_000_000_000L,
                 30_000_000_000L,
-                20_000_000_000L));
+                20_000_000_000L,
+                false));
 
     assertEquals("2.0 TB", view.total());
     assertTrue(view.exceedsLimit());
@@ -47,7 +51,8 @@ class StorageViewTest {
 
   @Test
   void anEmptyVolumeReportsZeroPercentages() {
-    StorageView view = StorageView.of(new StorageSnapshot(Path.of("/data"), 0L, 0L, 0L, 0L, 0L));
+    StorageView view =
+        StorageView.of(new StorageSnapshot(Path.of("/data"), 0L, 0L, 0L, 0L, 0L, false));
 
     assertEquals("0", view.usedPercent());
     assertEquals("0", view.songRadarPercent());

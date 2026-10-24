@@ -9,7 +9,8 @@ public record StorageSnapshot(
     long usedBytes,
     long availableBytes,
     long songRadarBytes,
-    long limitBytes) {
+    long limitBytes,
+    boolean logicalCapacity) {
 
   public boolean exceedsLimit() {
     return songRadarBytes > limitBytes;

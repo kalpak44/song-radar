@@ -36,4 +36,8 @@ songradar:
     # Root of the mounted SongRadar volume. Playlist uploads and the future music
     # library share it, so the storage page reports the same filesystem they use.
     path: ${SONGRADAR_STORAGE_PATH:/data}
+    # Set for storage backends such as NFS subdirectory provisioners whose reported
+    # filesystem size is the whole server rather than the application's PVC request.
+    # Zero keeps automatic filesystem-capacity detection for local development.
+    capacity-gb: ${SONGRADAR_STORAGE_CAPACITY_GB:0}
     playlists: ${songradar.storage.path}/playlists
