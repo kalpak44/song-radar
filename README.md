@@ -3,144 +3,59 @@
 Self-hosted music discovery from IPTV and radio streams. Automatically identify songs, find available
 audio, and manage your personal music library.
 
-> **Status: initial scaffold.** The application starts, connects to PostgreSQL and serves a styled
-> homepage. There are no REST endpoints, no authentication and none of the music functionality yet.
+> **Status: initial scaffold.** Starts, connects to PostgreSQL and serves a homepage. No endpoints,
+> no auth, none of the music functionality yet.
 
-## Stack
+Java 25 · Spring Boot 4.1 (Web MVC, Thymeleaf, Data JDBC) · PostgreSQL · Tailwind CSS 4
 
-| Piece       | What                                                          |
-|-------------|---------------------------------------------------------------|
-| Language    | Java 25                                                       |
-| Framework   | Spring Boot 4.1 — Spring Web MVC, Thymeleaf, Spring Data JDBC |
-| Database    | PostgreSQL                                                    |
-| Styling     | Tailwind CSS 4, compiled by the Maven build                   |
-| Build       | Maven (wrapper included — no Maven install required)          |
+## Run
 
-## Requirements
-
-- JDK 25
-- A reachable PostgreSQL database
-- Docker, if you want the quickest way to get that database
-
-Node is **not** required: the build downloads its own copy into the project to compile the stylesheet.
-
-## Running locally
-
-### 1. Start PostgreSQL
+Needs JDK 25 and a PostgreSQL database. Node is not required — the build fetches its own to compile
+the stylesheet.
 
 ```bash
-docker run -d --name songradar-pg \
-  -e POSTGRES_DB=songradar \
-  -e POSTGRES_USER=songradar \
-  -e POSTGRES_PASSWORD=songradar \
-  -p 5432:5432 \
+docker run -d --name songradar-pg -p 5432:5432 \
+  -e POSTGRES_DB=songradar -e POSTGRES_USER=songradar -e POSTGRES_PASSWORD=songradar \
   postgres:18-alpine
-```
 
-### 2. Configure the environment
-
-```bash
-cp .env.example .env
-set -a && source .env && set +a
-```
-
-`.env.example` matches the container above, so it works unedited. `.env` itself is gitignored.
-
-### 3. Run
-
-```bash
+cp .env.example .env && set -a && source .env && set +a
 ./mvnw spring-boot:run
 ```
 
-Then open <http://localhost:8080>.
-
-On startup the log reports the database it reached:
-
-```
-i.g.k.s.config.DatabaseStartupCheck : Connected to PostgreSQL 18.6 on aarch64-unknown-linux-musl ...
-```
-
-A wrong host or password fails here, at startup, rather than on the first page that reads from the
-database.
+<http://localhost:8080>. The startup log reports the database it reached, so a wrong host or password
+fails there rather than on the first page that reads from it.
 
 ## Configuration
 
-Every setting is an environment variable with a local-development default, so the same jar runs
-against a container on a laptop and a managed database with nothing but the environment changed.
+All environment variables, defaulted for local development in `.env.example`:
+`SONGRADAR_DB_HOST`, `SONGRADAR_DB_PORT`, `SONGRADAR_DB_NAME`, `SONGRADAR_DB_USERNAME`,
+`SONGRADAR_DB_PASSWORD`, `SONGRADAR_PORT`, `SONGRADAR_TEMPLATE_CACHE`.
 
-| Variable                   | Default     | Notes                                                       |
-|----------------------------|-------------|--------------------------------------------------------------|
-| `SONGRADAR_DB_HOST`        | `localhost` |                                                               |
-| `SONGRADAR_DB_PORT`        | `5432`      |                                                               |
-| `SONGRADAR_DB_NAME`        | `songradar` |                                                               |
-| `SONGRADAR_DB_USERNAME`    | `songradar` |                                                               |
-| `SONGRADAR_DB_PASSWORD`    | *(none)*    | Required. No default — a fallback password reaches production unnoticed |
-| `SONGRADAR_PORT`           | `8080`      | HTTP port                                                     |
-| `SONGRADAR_TEMPLATE_CACHE` | `true`      | Set `false` to re-render templates on every request           |
-
-## Build
-
-```bash
-./mvnw clean package     # compiles the stylesheet, runs the tests, builds the jar
-./mvnw test              # tests only
-java -jar target/song-radar-0.0.1-SNAPSHOT.jar
-```
+`SONGRADAR_DB_PASSWORD` has no default — a fallback password is one that reaches production unnoticed.
 
 ## Checks
 
-CI runs these on every pull request, and a failure blocks the merge. Run them before pushing:
+CI runs these on every pull request and a failure blocks the merge:
 
 ```bash
-./mvnw fmt:check         # google-java-format, via Spotify's fmt-maven-plugin
-./mvnw fmt:format        # fixes what fmt:check reports
-./mvnw verify            # tests plus the JaCoCo coverage report
+./mvnw fmt:check     # google-java-format; fmt:format fixes it
+./mvnw verify        # tests + JaCoCo coverage
 ```
 
-The coverage report lands at `target/site/jacoco/index.html`. SonarCloud reads the XML next to it
-and its quality gate is waited on in CI, so a gate failure fails the check.
+SonarCloud's quality gate is waited on in CI, so a gate failure fails the check.
 
-## Container image
+## Image
 
-The image is built by [jib](https://github.com/GoogleContainerTools/jib) straight from the compiled
-classes — there is no Dockerfile. The base image is a Maven property in `pom.xml`.
+Built by jib from the compiled classes — no Dockerfile; the base image is a property in `pom.xml`.
+CI publishes `ghcr.io/kalpak44/song-radar` from `main`, tagged `latest` and the short SHA.
 
 ```bash
 ./mvnw package jib:dockerBuild -Djib.to.image=song-radar:local
-
-docker run --rm -p 8080:8080 \
-  -e SONGRADAR_DB_HOST=host.docker.internal \
-  -e SONGRADAR_DB_PASSWORD=songradar \
-  song-radar:local
 ```
-
-CI publishes `ghcr.io/kalpak44/song-radar` from `main`, tagged `latest` and with the commit's
-seven-character short SHA.
 
 ## Styling
 
-Tailwind input is `src/main/tailwind/app.css`; the compiled stylesheet is generated into
-`target/classes/static/css/app.css` and served at `/css/app.css`. It is a build artifact and is not
-committed.
-
-`./mvnw` rebuilds it on every run. To rebuild on save while editing templates:
-
-```bash
-npm run watch:css
-```
-
-Templates live outside the Tailwind input's directory, so `src/main/tailwind/app.css` registers them
-with `@source`. A template added anywhere else needs its own `@source` line, or the classes it uses
-are stripped from the build.
-
-## Layout
-
-```
-src/main/java/io/github/kalpak44/songradar/
-├── SongRadarApplication.java        # entry point
-├── config/DatabaseStartupCheck.java # proves the database connection at startup
-└── web/HomeController.java          # GET /
-src/main/resources/
-├── application.yml                  # environment-driven configuration
-└── templates/index.html             # the homepage
-src/main/tailwind/app.css            # Tailwind input
-```
+Tailwind input is `src/main/tailwind/app.css`; the build generates `target/classes/static/css/app.css`
+and is not committed. `npm run watch:css` rebuilds on save. Templates sit outside the input's
+directory, so they are registered with `@source` — a template added elsewhere needs its own line, or
+its classes are stripped.
