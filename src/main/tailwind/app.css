@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* Tailwind scans outward from this file and skips anything .gitignore'd. The templates
+   sit outside src/main/tailwind, so they have to be registered explicitly or every class
+   used in them is stripped from the build. */
+@source "../resources/templates";

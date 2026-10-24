@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: song-radar
+
+  # Every value comes from the environment with a local-development default, so the same
+  # jar runs against a container on a laptop and a managed database with nothing but env
+  # vars changed. SONGRADAR_DB_PASSWORD has no default on purpose — a fallback password
+  # is one that reaches production unnoticed.
+  datasource:
+    url: jdbc:postgresql://${SONGRADAR_DB_HOST:localhost}:${SONGRADAR_DB_PORT:5432}/${SONGRADAR_DB_NAME:songradar}
+    username: ${SONGRADAR_DB_USERNAME:songradar}
+    password: ${SONGRADAR_DB_PASSWORD}
+    hikari:
+      pool-name: songradar-pool
+
+  thymeleaf:
+    cache: ${SONGRADAR_TEMPLATE_CACHE:true}
+
+server:
+  port: ${SONGRADAR_PORT:8080}

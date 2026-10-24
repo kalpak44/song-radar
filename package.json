@@ -1,0 +1,14 @@
+{
+  "name": "song-radar",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Tailwind stylesheet build for the SongRadar Thymeleaf templates",
+  "scripts": {
+    "build:css": "tailwindcss -i src/main/tailwind/app.css -o target/classes/static/css/app.css --minify",
+    "watch:css": "tailwindcss -i src/main/tailwind/app.css -o target/classes/static/css/app.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "tailwindcss": "^4.3.3"
+  }
+}
