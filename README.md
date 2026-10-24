@@ -86,6 +86,36 @@ against a container on a laptop and a managed database with nothing but the envi
 java -jar target/song-radar-0.0.1-SNAPSHOT.jar
 ```
 
+## Checks
+
+CI runs these on every pull request, and a failure blocks the merge. Run them before pushing:
+
+```bash
+./mvnw fmt:check         # google-java-format, via Spotify's fmt-maven-plugin
+./mvnw fmt:format        # fixes what fmt:check reports
+./mvnw verify            # tests plus the JaCoCo coverage report
+```
+
+The coverage report lands at `target/site/jacoco/index.html`. SonarCloud reads the XML next to it
+and its quality gate is waited on in CI, so a gate failure fails the check.
+
+## Container image
+
+The image is built by [jib](https://github.com/GoogleContainerTools/jib) straight from the compiled
+classes — there is no Dockerfile. The base image is a Maven property in `pom.xml`.
+
+```bash
+./mvnw package jib:dockerBuild -Djib.to.image=song-radar:local
+
+docker run --rm -p 8080:8080 \
+  -e SONGRADAR_DB_HOST=host.docker.internal \
+  -e SONGRADAR_DB_PASSWORD=songradar \
+  song-radar:local
+```
+
+CI publishes `ghcr.io/kalpak44/song-radar` from `main`, tagged `latest` and with the commit's
+seven-character short SHA.
+
 ## Styling
 
 Tailwind input is `src/main/tailwind/app.css`; the compiled stylesheet is generated into

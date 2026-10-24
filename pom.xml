@@ -19,9 +19,21 @@
 
     <properties>
         <java.version>25</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
         <node.version>v24.14.0</node.version>
         <npm.version>11.9.0</npm.version>
+
         <frontend-maven-plugin.version>2.0.2</frontend-maven-plugin.version>
+        <maven.enforcer.plugin.version>3.6.3</maven.enforcer.plugin.version>
+        <fmt.plugin.version>2.29</fmt.plugin.version>
+        <jacoco.plugin.version>0.8.15</jacoco.plugin.version>
+        <sonar.plugin.version>5.8.0.7211</sonar.plugin.version>
+        <jib.plugin.version>3.5.2</jib.plugin.version>
+
+        <sonar.projectKey>song-radar</sonar.projectKey>
+        <sonar.organization>kalpak44</sonar.organization>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.basedir}/target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
     <dependencies>
@@ -64,6 +76,93 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- The pom declares Java 25 but the compiler only needs a 25 bytecode
+                 target, which an older JDK can be asked for and then fail on a 25
+                 language feature. Fail on the JDK itself instead. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>${maven.enforcer.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>enforce-java</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>${java.version}</version>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- google-java-format, with no style settings to argue about. `fmt:check`
+                 is the CI gate; `fmt:format` is what fixes a failure. -->
+            <plugin>
+                <groupId>com.spotify.fmt</groupId>
+                <artifactId>fmt-maven-plugin</artifactId>
+                <version>${fmt.plugin.version}</version>
+            </plugin>
+
+            <!-- Produces the XML report Sonar reads for coverage. No check rule yet:
+                 a floor set against a single test is one that stays low. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>${sonar.plugin.version}</version>
+            </plugin>
+
+            <!-- Builds the container image from target/classes with no Dockerfile, which
+                 is why dependabot.yml has no `docker` entry: the base image is pinned
+                 here and moves as a Maven property. -->
+            <plugin>
+                <groupId>com.google.cloud.tools</groupId>
+                <artifactId>jib-maven-plugin</artifactId>
+                <version>${jib.plugin.version}</version>
+                <configuration>
+                    <from>
+                        <!-- Rebuilt by its publisher after the current Alpine security
+                             updates. The Temurin JRE image on the same Alpine release
+                             lags those rebuilds, and the scan reports the difference as
+                             fixable Critical findings in OpenSSL and expat. -->
+                        <image>azul/zulu-openjdk-alpine:25-jre-headless</image>
+                    </from>
+                    <container>
+                        <mainClass>io.github.kalpak44.songradar.SongRadarApplication</mainClass>
+                        <ports>
+                            <port>8080</port>
+                        </ports>
+                        <!-- Without this every build produces the same 1970 timestamp, so
+                             `docker images` cannot tell a fresh image from a stale one. -->
+                        <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
+                    </container>
+                </configuration>
             </plugin>
 
             <!-- Builds the Tailwind stylesheet as part of the Maven build, so a plain
