@@ -17,59 +17,63 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class StorageSettingsController {
 
   private static final String REDIRECT_STORAGE = "redirect:/settings/storage";
+  private static final String STORAGE = "storage";
+  private static final String STORAGE_LIMIT_FORM = "storageLimitForm";
+  private static final String SUCCESS_MESSAGE = "successMessage";
+  private static final String ERROR_MESSAGE = "errorMessage";
+  private static final String BINDING_RESULT_STORAGE_LIMIT_FORM =
+      "org.springframework.validation.BindingResult." + STORAGE_LIMIT_FORM;
 
-  private final StorageService storage;
+  private final StorageService storageService;
 
-  public StorageSettingsController(StorageService storage) {
-    this.storage = storage;
+  public StorageSettingsController(StorageService storageService) {
+    this.storageService = storageService;
   }
 
   @GetMapping("/settings/storage")
   public String storage(Model model) {
-    model.addAttribute("activeNav", "storage");
+    model.addAttribute("activeNav", STORAGE);
     try {
-      StorageView view = StorageView.of(storage.snapshot());
-      model.addAttribute("storage", view);
-      if (!model.containsAttribute("storageLimitForm")) {
+      StorageView view = StorageView.of(storageService.snapshot());
+      model.addAttribute(STORAGE, view);
+      if (!model.containsAttribute(STORAGE_LIMIT_FORM)) {
         StorageLimitForm form = new StorageLimitForm();
         form.setLimitGb(new java.math.BigDecimal(view.limitGb()));
-        model.addAttribute("storageLimitForm", form);
+        model.addAttribute(STORAGE_LIMIT_FORM, form);
       }
-    } catch (UncheckedIOException | DataAccessException e) {
+    } catch (UncheckedIOException | DataAccessException _) {
       model.addAttribute(
           "storageError",
           "Storage information is temporarily unavailable. Check the configured path.");
     }
-    return "storage";
+    return STORAGE;
   }
 
   @PostMapping("/settings/storage")
   public String save(
-      @Valid @ModelAttribute("storageLimitForm") StorageLimitForm form,
+      @Valid @ModelAttribute(STORAGE_LIMIT_FORM) StorageLimitForm form,
       BindingResult binding,
       RedirectAttributes redirect) {
     if (binding.hasErrors()) {
       preserveValidation(binding, form, redirect);
-      return REDIRECT_STORAGE;
-    }
-
-    try {
-      storage.saveLimit(form.getLimitGb());
-      redirect.addFlashAttribute("successMessage", "Storage limit saved.");
-    } catch (IllegalArgumentException e) {
-      binding.rejectValue("limitGb", "limit.invalid", e.getMessage());
-      preserveValidation(binding, form, redirect);
-    } catch (UncheckedIOException | DataAccessException e) {
-      redirect.addFlashAttribute(
-          "errorMessage", "The storage limit could not be saved. Try again.");
+    } else {
+      try {
+        storageService.saveLimit(form.getLimitGb());
+        redirect.addFlashAttribute(SUCCESS_MESSAGE, "Storage limit saved.");
+      } catch (IllegalArgumentException e) {
+        binding.rejectValue("limitGb", "limit.invalid", e.getMessage());
+        preserveValidation(binding, form, redirect);
+      } catch (UncheckedIOException | DataAccessException _) {
+        redirect.addFlashAttribute(
+            ERROR_MESSAGE, "The storage limit could not be saved. Try again.");
+      }
     }
     return REDIRECT_STORAGE;
   }
 
   private static void preserveValidation(
       BindingResult binding, StorageLimitForm form, RedirectAttributes redirect) {
-    redirect.addFlashAttribute(
-        "org.springframework.validation.BindingResult.storageLimitForm", binding);
-    redirect.addFlashAttribute("storageLimitForm", form);
+    redirect.addFlashAttribute(BINDING_RESULT_STORAGE_LIMIT_FORM, binding);
+    redirect.addFlashAttribute(STORAGE_LIMIT_FORM, form);
   }
 }

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -73,5 +74,33 @@ class StorageServiceTest {
         assertThrows(IllegalArgumentException.class, () -> service.saveLimit(tooLarge));
 
     assertEquals("The storage limit cannot exceed the volume capacity.", failure.getMessage());
+  }
+
+  @Test
+  void saveRejectsAValueOutsideTheSupportedRange() {
+    BigDecimal tooLarge = new BigDecimal("999999999999999999999999999999");
+
+    IllegalArgumentException failure =
+        assertThrows(IllegalArgumentException.class, () -> service.saveLimit(tooLarge));
+
+    assertEquals("Enter a valid storage limit.", failure.getMessage());
+  }
+
+  @Test
+  void saveRejectsAZeroLimit() {
+    IllegalArgumentException failure =
+        assertThrows(IllegalArgumentException.class, () -> service.saveLimit(BigDecimal.ZERO));
+
+    assertEquals("The storage limit must be greater than zero.", failure.getMessage());
+  }
+
+  @Test
+  void snapshotWrapsFilesystemFailures() throws Exception {
+    Path fileInsteadOfDirectory = Files.writeString(root.resolve("not-a-directory"), "x");
+    StorageService invalidRoot = new StorageService(fileInsteadOfDirectory, settings);
+
+    UncheckedIOException failure = assertThrows(UncheckedIOException.class, invalidRoot::snapshot);
+
+    assertEquals("could not inspect the SongRadar storage volume", failure.getMessage());
   }
 }

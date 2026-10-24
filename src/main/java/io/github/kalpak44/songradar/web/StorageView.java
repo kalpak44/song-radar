@@ -67,7 +67,7 @@ public record StorageView(
     if (whole <= 0) {
       return "0";
     }
-    double percent = Math.min(100, Math.max(0, part * 100.0 / whole));
+    double percent = Math.clamp(part * 100.0 / whole, 0.0, 100.0);
     return String.format(Locale.ENGLISH, "%.1f", percent);
   }
 }

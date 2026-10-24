@@ -26,6 +26,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class SettingsController {
 
   private static final String REDIRECT_SETTINGS = "redirect:/settings";
+  private static final String ADD_URL_FORM = "addUrlForm";
+  private static final String SUCCESS_MESSAGE = "successMessage";
+  private static final String ERROR_MESSAGE = "errorMessage";
+  private static final String BINDING_RESULT_ADD_URL_FORM =
+      "org.springframework.validation.BindingResult." + ADD_URL_FORM;
 
   private final PlaylistSourceService service;
   private final ZoneId zone;
@@ -39,15 +44,15 @@ public class SettingsController {
   public String settings(Model model) {
     model.addAttribute("activeNav", "settings");
     model.addAttribute("sources", PlaylistSourceView.of(service.findAll(), zone));
-    if (!model.containsAttribute("addUrlForm")) {
-      model.addAttribute("addUrlForm", new AddUrlForm());
+    if (!model.containsAttribute(ADD_URL_FORM)) {
+      model.addAttribute(ADD_URL_FORM, new AddUrlForm());
     }
     return "settings";
   }
 
   @PostMapping("/settings/sources/url")
   public String addUrl(
-      @Valid @ModelAttribute("addUrlForm") AddUrlForm form,
+      @Valid @ModelAttribute(ADD_URL_FORM) AddUrlForm form,
       BindingResult binding,
       RedirectAttributes redirect) {
 
@@ -57,17 +62,15 @@ public class SettingsController {
     if (binding.hasErrors()) {
       // The form bean and its errors have to survive the redirect, or the page renders
       // an empty form with no explanation of what was wrong.
-      redirect.addFlashAttribute(
-          "org.springframework.validation.BindingResult.addUrlForm", binding);
-      redirect.addFlashAttribute("addUrlForm", form);
-      return REDIRECT_SETTINGS;
-    }
-
-    try {
-      var saved = service.addUrl(form.getUrl(), form.getName());
-      redirect.addFlashAttribute("successMessage", "Added \"" + saved.name() + "\".");
-    } catch (DataAccessException e) {
-      redirect.addFlashAttribute("errorMessage", "That playlist could not be saved.");
+      redirect.addFlashAttribute(BINDING_RESULT_ADD_URL_FORM, binding);
+      redirect.addFlashAttribute(ADD_URL_FORM, form);
+    } else {
+      try {
+        var saved = service.addUrl(form.getUrl(), form.getName());
+        redirect.addFlashAttribute(SUCCESS_MESSAGE, "Added \"" + saved.name() + "\".");
+      } catch (DataAccessException _) {
+        redirect.addFlashAttribute(ERROR_MESSAGE, "That playlist could not be saved.");
+      }
     }
     return REDIRECT_SETTINGS;
   }
@@ -79,23 +82,18 @@ public class SettingsController {
       RedirectAttributes redirect) {
 
     if (file == null || file.isEmpty()) {
-      redirect.addFlashAttribute("errorMessage", "Choose a file to upload.");
-      return REDIRECT_SETTINGS;
-    }
-    if (!PlaylistSourceService.hasAllowedExtension(file.getOriginalFilename())) {
-      redirect.addFlashAttribute("errorMessage", "Only .m3u and .m3u8 files can be uploaded.");
-      return REDIRECT_SETTINGS;
-    }
-    if (name != null && name.trim().length() > 200) {
-      redirect.addFlashAttribute("errorMessage", "Use a playlist name of at most 200 characters.");
-      return REDIRECT_SETTINGS;
-    }
-
-    try {
-      var saved = service.addFile(file, name);
-      redirect.addFlashAttribute("successMessage", "Uploaded \"" + saved.name() + "\".");
-    } catch (UncheckedIOException | DataAccessException e) {
-      redirect.addFlashAttribute("errorMessage", "That file could not be stored.");
+      redirect.addFlashAttribute(ERROR_MESSAGE, "Choose a file to upload.");
+    } else if (!PlaylistSourceService.hasAllowedExtension(file.getOriginalFilename())) {
+      redirect.addFlashAttribute(ERROR_MESSAGE, "Only .m3u and .m3u8 files can be uploaded.");
+    } else if (name != null && name.trim().length() > 200) {
+      redirect.addFlashAttribute(ERROR_MESSAGE, "Use a playlist name of at most 200 characters.");
+    } else {
+      try {
+        var saved = service.addFile(file, name);
+        redirect.addFlashAttribute(SUCCESS_MESSAGE, "Uploaded \"" + saved.name() + "\".");
+      } catch (UncheckedIOException | DataAccessException _) {
+        redirect.addFlashAttribute(ERROR_MESSAGE, "That file could not be stored.");
+      }
     }
     return REDIRECT_SETTINGS;
   }
@@ -104,12 +102,12 @@ public class SettingsController {
   public String remove(@PathVariable long id, RedirectAttributes redirect) {
     try {
       if (service.remove(id)) {
-        redirect.addFlashAttribute("successMessage", "Playlist removed.");
+        redirect.addFlashAttribute(SUCCESS_MESSAGE, "Playlist removed.");
       } else {
-        redirect.addFlashAttribute("errorMessage", "That playlist no longer exists.");
+        redirect.addFlashAttribute(ERROR_MESSAGE, "That playlist no longer exists.");
       }
-    } catch (UncheckedIOException | DataAccessException e) {
-      redirect.addFlashAttribute("errorMessage", "That playlist could not be removed.");
+    } catch (UncheckedIOException | DataAccessException _) {
+      redirect.addFlashAttribute(ERROR_MESSAGE, "That playlist could not be removed.");
     }
     return REDIRECT_SETTINGS;
   }

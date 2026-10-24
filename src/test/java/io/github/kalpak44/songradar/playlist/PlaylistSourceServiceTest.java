@@ -2,15 +2,19 @@ package io.github.kalpak44.songradar.playlist;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -23,6 +27,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 class PlaylistSourceServiceTest {
 
@@ -110,6 +115,35 @@ class PlaylistSourceServiceTest {
     assertThrows(DataAccessResourceFailureException.class, () -> service.addFile(upload, null));
 
     verify(storage).delete("stored.m3u");
+  }
+
+  @Test
+  void addFileKeepsACleanupFailureAsSuppressed() {
+    when(storage.store(any(), anyString())).thenReturn("stored.m3u");
+    DataAccessResourceFailureException saveFailure =
+        new DataAccessResourceFailureException("offline");
+    when(repository.save(any())).thenThrow(saveFailure);
+    doThrow(new IllegalStateException("delete failed")).when(storage).delete("stored.m3u");
+    MockMultipartFile upload = new MockMultipartFile("file", "list.m3u", null, "x".getBytes());
+
+    DataAccessResourceFailureException thrown =
+        assertThrows(DataAccessResourceFailureException.class, () -> service.addFile(upload, null));
+
+    assertSame(saveFailure, thrown);
+    assertEquals(1, thrown.getSuppressed().length);
+    assertEquals("delete failed", thrown.getSuppressed()[0].getMessage());
+  }
+
+  @Test
+  void addFileWrapsAnUnreadableUpload() throws Exception {
+    MultipartFile upload = mock(MultipartFile.class);
+    when(upload.getOriginalFilename()).thenReturn("list.m3u");
+    when(upload.getInputStream()).thenThrow(new IOException("unreadable"));
+
+    UncheckedIOException failure =
+        assertThrows(UncheckedIOException.class, () -> service.addFile(upload, null));
+
+    assertEquals("could not read the uploaded playlist", failure.getMessage());
   }
 
   @Test

@@ -104,7 +104,7 @@ public class PlaylistSourceService {
       return uri.isAbsolute()
           && uri.getHost() != null
           && ("http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme));
-    } catch (URISyntaxException e) {
+    } catch (URISyntaxException _) {
       return false;
     }
   }

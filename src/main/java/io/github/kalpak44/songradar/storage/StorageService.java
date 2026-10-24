@@ -76,7 +76,7 @@ public class StorageService {
   private static long sizeOrZero(Path path) {
     try {
       return Files.size(path);
-    } catch (IOException e) {
+    } catch (IOException _) {
       return 0;
     }
   }

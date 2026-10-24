@@ -44,4 +44,14 @@ class StorageViewTest {
     assertEquals("2.0 TB", view.total());
     assertTrue(view.exceedsLimit());
   }
+
+  @Test
+  void anEmptyVolumeReportsZeroPercentages() {
+    StorageView view = StorageView.of(new StorageSnapshot(Path.of("/data"), 0L, 0L, 0L, 0L, 0L));
+
+    assertEquals("0", view.usedPercent());
+    assertEquals("0", view.songRadarPercent());
+    assertEquals("0", view.otherUsedPercent());
+    assertEquals("0", view.limitPercent());
+  }
 }

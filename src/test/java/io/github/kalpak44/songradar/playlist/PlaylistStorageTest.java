@@ -27,7 +27,7 @@ class PlaylistStorageTest {
   }
 
   @Test
-  void storeIgnoresDirectoriesInTheSuppliedFilename() throws Exception {
+  void storeIgnoresDirectoriesInTheSuppliedFilename() {
     PlaylistStorage storage = new PlaylistStorage(root);
 
     String stored = storage.store(stream("x"), "../../etc/passwd.m3u");
@@ -46,7 +46,7 @@ class PlaylistStorageTest {
   }
 
   @Test
-  void deleteRemovesTheFileAndToleratesAMissingOne() throws Exception {
+  void deleteRemovesTheFileAndToleratesAMissingOne() {
     PlaylistStorage storage = new PlaylistStorage(root);
     String stored = storage.store(stream("x"), "a.m3u");
 
