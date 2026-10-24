@@ -56,6 +56,18 @@ class PlaylistStorageTest {
     assertDoesNotThrow(() -> storage.delete(stored), "deleting twice should be harmless");
   }
 
+  @Test
+  void openReadsAStoredPlaylistAndRejectsTraversal() throws Exception {
+    PlaylistStorage storage = new PlaylistStorage(root);
+    String stored = storage.store(stream("#EXTM3U"), "a.m3u");
+
+    try (var input = storage.open(stored)) {
+      assertEquals("#EXTM3U", new String(input.readAllBytes(), StandardCharsets.UTF_8));
+    }
+    org.junit.jupiter.api.Assertions.assertThrows(
+        IllegalArgumentException.class, () -> storage.open("../outside.m3u"));
+  }
+
   private static ByteArrayInputStream stream(String content) {
     return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
   }

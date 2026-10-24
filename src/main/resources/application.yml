@@ -41,3 +41,6 @@ songradar:
     # Zero keeps automatic filesystem-capacity detection for local development.
     capacity-gb: ${SONGRADAR_STORAGE_CAPACITY_GB:0}
     playlists: ${songradar.storage.path}/playlists
+    recordings: ${songradar.storage.path}/recordings
+  listeners:
+    scheduler-threads: ${SONGRADAR_LISTENER_THREADS:2}

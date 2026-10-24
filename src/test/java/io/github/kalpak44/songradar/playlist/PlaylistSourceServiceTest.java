@@ -54,6 +54,14 @@ class PlaylistSourceServiceTest {
   }
 
   @Test
+  void findDelegatesToTheRepository() {
+    PlaylistSource source = PlaylistSource.ofUrl("a", "https://e.com/a.m3u", NOW);
+    when(repository.findById(7L)).thenReturn(Optional.of(source));
+
+    assertEquals(Optional.of(source), service.find(7L));
+  }
+
+  @Test
   void addUrlKeepsTheSuppliedNameAndTrims() {
     PlaylistSource saved = service.addUrl("  https://e.com/a.m3u  ", "  Music TV  ");
 

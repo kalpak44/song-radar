@@ -46,6 +46,19 @@ public class PlaylistStorage {
     }
   }
 
+  /** Opens a stored playlist after confirming its database path cannot escape the root. */
+  public InputStream open(String storedPath) {
+    Path path = root.resolve(storedPath).normalize();
+    if (!path.startsWith(root.normalize())) {
+      throw new IllegalArgumentException("playlist path escapes the storage directory");
+    }
+    try {
+      return Files.newInputStream(path);
+    } catch (IOException e) {
+      throw new UncheckedIOException("could not read the stored playlist", e);
+    }
+  }
+
   private static String extensionOf(String filename) {
     if (filename == null) {
       return "";

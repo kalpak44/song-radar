@@ -104,14 +104,23 @@
                 <circle cx="17" cy="17" r="2.5"/>
                 <path d="M19.5 17V8l2.5 1"/>
             </svg>
-            <div class="min-w-0 flex-1">
-                <p class="truncate text-sm text-slate-100" th:text="${source.name}">Music TV</p>
+            <a th:href="@{/playlists/{id}(id=${source.id})}"
+               class="group min-w-0 flex-1 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70">
+                <p class="truncate text-sm text-slate-100 transition-colors group-hover:text-emerald-300"
+                   th:text="${source.name}">Music TV</p>
                 <p class="mt-0.5 text-xs text-slate-500">
                     <span th:text="${source.typeLabel}">URL</span>
                     &middot;
                     <span th:text="${source.addedOn}">Oct 24</span>
                 </p>
-            </div>
+            </a>
+            <a th:href="@{/playlists/{id}(id=${source.id})}" th:aria-label="|'Open ' + ${source.name}|"
+               class="rounded-md p-2 text-slate-600 transition-colors hover:bg-slate-800 hover:text-slate-300">
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.75" aria-hidden="true">
+                    <path d="m9 18 6-6-6-6"/>
+                </svg>
+            </a>
             <form th:action="@{/settings/sources/{id}/remove(id=${source.id})}" method="post"
                   onsubmit="return confirm('Remove this playlist source?')">
                 <button type="submit" th:aria-label="'Remove ' + ${source.name}"

@@ -7,6 +7,7 @@ import java.net.URISyntaxException;
 import java.time.Clock;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,6 +30,10 @@ public class PlaylistSourceService {
 
   public List<PlaylistSource> findAll() {
     return repository.findAllByOrderByAddedAtDesc();
+  }
+
+  public Optional<PlaylistSource> find(long id) {
+    return repository.findById(id);
   }
 
   public PlaylistSource addUrl(String url, String name) {

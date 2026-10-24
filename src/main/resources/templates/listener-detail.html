@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en" th:replace="~{layout :: page(${editing} ? 'Edit listener' : 'Add listener', ~{:: #content})}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main id="content" class="min-w-0 flex-1 px-5 py-6 sm:px-7 lg:px-10 lg:py-9">
+    <div class="mx-auto max-w-5xl">
+        <nav class="flex items-center gap-2 text-xs text-slate-500" aria-label="Breadcrumb">
+            <a th:href="@{/settings}" class="transition-colors hover:text-slate-300">Playlists</a>
+            <span aria-hidden="true">/</span>
+            <a th:href="@{/playlists/{id}(id=${playlist.id})}" class="truncate transition-colors hover:text-slate-300"
+               th:text="${playlist.name}">Music TV</a>
+            <span aria-hidden="true">/</span>
+            <span class="text-slate-400" th:text="${editing} ? 'Edit listener' : 'New listener'">New listener</span>
+        </nav>
+
+        <div class="mt-5 border-b border-slate-800/80 pb-6">
+            <p class="text-[0.68rem] font-medium uppercase tracking-[0.18em] text-emerald-400/80">Listener details</p>
+            <h1 class="mt-1 text-2xl font-semibold tracking-tight"
+                th:text="${editing} ? 'Edit listener' : 'Add listener'">Add listener</h1>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
+                Select one channel from <span class="text-slate-200" th:text="${playlist.name}">Music TV</span>
+                and set the cadence for its short audio captures.
+            </p>
+        </div>
+
+        <form method="post" th:object="${listenerForm}"
+              th:action="${editing} ? @{/playlists/{playlistId}/listeners/{listenerId}(playlistId=${playlist.id},listenerId=${listenerId})} : @{/playlists/{playlistId}/listeners(playlistId=${playlist.id})}"
+              class="mt-7 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <div class="space-y-5">
+                <section class="rounded-2xl border border-slate-800/90 bg-slate-900/30 p-5 sm:p-6">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-base font-semibold">Channel</h2>
+                            <p class="mt-1 text-sm text-slate-500">Search inside this playlist; channels are not stored separately.</p>
+                        </div>
+                        <span class="rounded-full bg-slate-800/80 px-2.5 py-1 font-mono text-[0.68rem] text-slate-400"
+                              th:text="|${#lists.size(channels)} found|">24 found</span>
+                    </div>
+
+                    <div th:if="${channelLoadError}" role="alert"
+                         class="mt-4 rounded-lg border border-amber-800/60 bg-amber-950/30 px-4 py-3 text-sm text-amber-200"
+                         th:text="${channelLoadError}">The playlist could not be loaded.</div>
+
+                    <div class="relative mt-4">
+                        <svg class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-slate-600"
+                             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                            <circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>
+                        </svg>
+                        <input id="channel-search" type="search" autocomplete="off" placeholder="Search channels by name..."
+                               class="w-full rounded-lg border border-slate-700 bg-slate-950/70 py-2.5 pr-3 pl-10 text-sm
+                                      text-slate-100 placeholder:text-slate-600 focus:border-emerald-600
+                                      focus:ring-1 focus:ring-emerald-600 focus:outline-none">
+                    </div>
+
+                    <div id="channel-list" class="mt-3 max-h-80 space-y-1 overflow-y-auto rounded-xl border border-slate-800 bg-black/20 p-1.5">
+                        <label th:each="channel : ${channels}" data-channel-row
+                               th:attr="data-search=${#strings.toLowerCase(channel.name)}"
+                               class="group relative flex cursor-pointer items-center gap-3 rounded-lg px-3 py-3 transition hover:bg-slate-900">
+                            <input type="radio" th:field="*{channelUrl}" th:value="${channel.streamUrl}"
+                                   class="peer sr-only">
+                            <span class="grid size-8 shrink-0 place-items-center rounded-lg border border-slate-800 bg-slate-900
+                                         text-slate-500 transition peer-checked:border-emerald-700 peer-checked:text-emerald-400">
+                                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="1.7" aria-hidden="true">
+                                    <path d="M8 9a5 5 0 0 0 0 6M5 6a9 9 0 0 0 0 12M16 9a5 5 0 0 1 0 6M19 6a9 9 0 0 1 0 12"/>
+                                    <circle cx="12" cy="12" r="2"/>
+                                </svg>
+                            </span>
+                            <span class="min-w-0 flex-1 truncate text-sm text-slate-300 peer-checked:text-slate-100"
+                                  th:text="${channel.name}">MTV Hits</span>
+                            <span class="hidden text-emerald-400 peer-checked:block" aria-hidden="true">&#10003;</span>
+                        </label>
+                        <p id="no-channel-results" class="hidden px-3 py-8 text-center text-sm text-slate-500">
+                            No channels match that search.
+                        </p>
+                        <p th:if="${#lists.isEmpty(channels) and channelLoadError == null}"
+                           class="px-3 py-8 text-center text-sm text-slate-500">
+                            This playlist contains no supported HTTP channels.
+                        </p>
+                    </div>
+                    <p th:if="${#fields.hasErrors('channelUrl')}" th:errors="*{channelUrl}"
+                       class="mt-2 text-xs text-red-300">Choose a channel.</p>
+                </section>
+
+                <section class="rounded-2xl border border-slate-800/90 bg-slate-900/30 p-5 sm:p-6">
+                    <h2 class="text-base font-semibold">Schedule</h2>
+                    <p class="mt-1 text-sm text-slate-500">Recordings never overlap for the same listener.</p>
+                    <div class="mt-5 grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label for="intervalMinutes" class="mb-1.5 block text-xs font-medium text-slate-400">Record every</label>
+                            <div class="relative">
+                                <input id="intervalMinutes" type="number" min="1" max="1440" th:field="*{intervalMinutes}"
+                                       th:errorclass="border-red-700"
+                                       class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 pr-20 font-mono
+                                              text-sm text-slate-100 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-none">
+                                <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-slate-500">minutes</span>
+                            </div>
+                            <p th:if="${#fields.hasErrors('intervalMinutes')}" th:errors="*{intervalMinutes}"
+                               class="mt-1.5 text-xs text-red-300">Interval error</p>
+                        </div>
+                        <div>
+                            <label for="durationSeconds" class="mb-1.5 block text-xs font-medium text-slate-400">Record duration</label>
+                            <div class="relative">
+                                <input id="durationSeconds" type="number" min="1" max="300" th:field="*{durationSeconds}"
+                                       th:errorclass="border-red-700"
+                                       class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 pr-20 font-mono
+                                              text-sm text-slate-100 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-none">
+                                <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-slate-500">seconds</span>
+                            </div>
+                            <p th:if="${#fields.hasErrors('durationSeconds')}" th:errors="*{durationSeconds}"
+                               class="mt-1.5 text-xs text-red-300">Duration error</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <aside class="h-fit rounded-2xl border border-slate-800/90 bg-slate-900/30 p-5 lg:sticky lg:top-6">
+                <label for="name" class="block text-xs font-medium text-slate-400">Listener name</label>
+                <input id="name" type="text" maxlength="200" th:field="*{name}" th:errorclass="border-red-700"
+                       placeholder="MTV Hits Listener"
+                       class="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm
+                              text-slate-100 placeholder:text-slate-600 focus:border-emerald-600
+                              focus:ring-1 focus:ring-emerald-600 focus:outline-none">
+                <p th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="mt-1.5 text-xs text-red-300">Name error</p>
+
+                <label class="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-800 bg-black/20 p-3.5">
+                    <input type="checkbox" th:field="*{active}"
+                           class="mt-0.5 size-4 rounded border-slate-600 bg-slate-900 text-emerald-500 focus:ring-emerald-500/40">
+                    <span>
+                        <span class="block text-sm font-medium text-slate-200">Listener active</span>
+                        <span class="mt-0.5 block text-xs leading-5 text-slate-500">Schedule recordings after saving.</span>
+                    </span>
+                </label>
+
+                <div class="mt-6 space-y-2 border-t border-slate-800 pt-5">
+                    <button type="submit"
+                            class="w-full rounded-lg bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-emerald-950
+                                   transition hover:bg-emerald-300 focus:ring-2 focus:ring-emerald-300/60 focus:outline-none"
+                            th:text="${editing} ? 'Save listener' : 'Add listener'">Add listener</button>
+                    <a th:href="@{/playlists/{id}(id=${playlist.id})}"
+                       class="block w-full rounded-lg px-4 py-2.5 text-center text-sm text-slate-400 transition hover:bg-slate-800 hover:text-slate-200">
+                        Cancel
+                    </a>
+                </div>
+            </aside>
+        </form>
+    </div>
+
+    <script>
+        (() => {
+            const search = document.getElementById('channel-search');
+            const rows = [...document.querySelectorAll('[data-channel-row]')];
+            const empty = document.getElementById('no-channel-results');
+            if (!search || rows.length === 0) return;
+
+            search.addEventListener('input', () => {
+                const query = search.value.trim().toLocaleLowerCase();
+                let visible = 0;
+                rows.forEach(row => {
+                    const matches = row.dataset.search.includes(query);
+                    row.classList.toggle('hidden', !matches);
+                    if (matches) visible++;
+                });
+                empty.classList.toggle('hidden', visible !== 0);
+            });
+        })();
+    </script>
+</main>
+</body>
+</html>
