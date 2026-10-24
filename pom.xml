@@ -158,9 +158,18 @@
                         <ports>
                             <port>8080</port>
                         </ports>
+                        <!-- jib declares no USER by default, and a Deployment that sets
+                             runAsNonRoot against such an image is refused by the kubelet
+                             at startup rather than at apply time. -->
+                        <user>1000:1000</user>
                         <!-- Without this every build produces the same 1970 timestamp, so
                              `docker images` cannot tell a fresh image from a stale one. -->
                         <creationTime>USE_CURRENT_TIMESTAMP</creationTime>
+                        <!-- Links the published package back to this repository; without
+                             it the registry page lists no source. -->
+                        <labels>
+                            <org.opencontainers.image.source>https://github.com/kalpak44/song-radar</org.opencontainers.image.source>
+                        </labels>
                     </container>
                 </configuration>
             </plugin>
