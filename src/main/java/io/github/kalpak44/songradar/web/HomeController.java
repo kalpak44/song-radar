@@ -1,13 +1,15 @@
 package io.github.kalpak44.songradar.web;
 
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 
 @Controller
 public class HomeController {
 
   @GetMapping("/")
-  public String home() {
-    return "index";
+  public String dashboard(Model model) {
+    model.addAttribute("activeNav", "dashboard");
+    return "dashboard";
   }
 }

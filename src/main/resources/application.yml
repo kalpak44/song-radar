@@ -16,5 +16,24 @@ spring:
   thymeleaf:
     cache: ${SONGRADAR_TEMPLATE_CACHE:true}
 
+  servlet:
+    multipart:
+      # An M3U playlist is text. A cap this low keeps a mistaken upload from filling the
+      # volume, and the handler turns the rejection into a message on the page.
+      max-file-size: 16MB
+      max-request-size: 16MB
+
+  # Spring Data JDBC never creates tables, so Flyway owns the schema outright.
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
 server:
   port: ${SONGRADAR_PORT:8080}
+
+songradar:
+  storage:
+    # Root of the mounted SongRadar volume. Playlist uploads and the future music
+    # library share it, so the storage page reports the same filesystem they use.
+    path: ${SONGRADAR_STORAGE_PATH:/data}
+    playlists: ${songradar.storage.path}/playlists

@@ -10,6 +10,9 @@ node/
 # Environment — .env holds real credentials; .env.example is the committed template.
 .env
 
+# Local uploads — the cluster keeps these on a volume.
+/data/
+
 # Logs
 *.log
 

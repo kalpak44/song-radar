@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" th:fragment="page(pageTitle, content)" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${pageTitle} + ' · SongRadar'">SongRadar</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body class="min-h-screen bg-black text-slate-100 antialiased">
+<div class="min-h-screen bg-slate-950/60">
+    <div class="flex min-h-screen flex-col">
+
+        <header class="flex items-center justify-between gap-4 border-b border-slate-800/80 px-5 py-4 sm:px-6">
+            <a class="flex items-center gap-2.5" th:href="@{/}">
+                <svg class="size-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.75" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9"/>
+                    <circle cx="12" cy="12" r="3.25"/>
+                    <path d="M12 3v3.4M12 17.6V21M3 12h3.4M17.6 12H21"/>
+                </svg>
+                <span class="text-base font-semibold tracking-tight">SongRadar</span>
+            </a>
+            <span class="inline-flex items-center gap-2 font-mono text-[0.68rem] font-medium tracking-[0.2em]
+                         text-slate-400" aria-label="SongRadar">
+                <span class="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]"
+                      aria-hidden="true"></span>
+                SONG<span class="text-emerald-400">/</span>RADAR
+            </span>
+        </header>
+
+        <div class="flex-1 sm:flex">
+            <!-- Horizontal above the content on a phone, a column beside it from `sm` up. -->
+            <nav class="flex gap-1 overflow-x-auto border-b border-slate-800/80 px-3 py-3
+                        sm:w-48 sm:shrink-0 sm:flex-col sm:gap-0.5 sm:border-r sm:border-b-0 sm:px-3 sm:py-5">
+                <a th:href="@{/}"
+                   th:classappend="${activeNav == 'dashboard'}
+                       ? 'bg-slate-800/60 text-slate-100'
+                       : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'"
+                   class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-colors">
+                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="1.75" aria-hidden="true">
+                        <rect x="3" y="3" width="7" height="7" rx="1.5"/>
+                        <rect x="14" y="3" width="7" height="7" rx="1.5"/>
+                        <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+                        <rect x="14" y="14" width="7" height="7" rx="1.5"/>
+                    </svg>
+                    Dashboard
+                </a>
+                <a th:href="@{/settings}"
+                   th:classappend="${activeNav == 'settings'}
+                       ? 'bg-slate-800/60 text-slate-100'
+                       : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'"
+                   class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-colors">
+                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="1.75" aria-hidden="true">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    Settings
+                </a>
+                <a th:href="@{/settings/storage}"
+                   th:classappend="${activeNav == 'storage'}
+                       ? 'bg-slate-800/60 text-slate-100'
+                       : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'"
+                   class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-colors
+                          sm:pl-7">
+                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="1.75" aria-hidden="true">
+                        <ellipse cx="12" cy="6" rx="8" ry="3"/>
+                        <path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/>
+                        <path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>
+                    </svg>
+                    Storage
+                </a>
+            </nav>
+
+            <main th:replace="${content}" class="min-w-0 flex-1 px-5 py-6 sm:px-7">
+                <p>Page content goes here.</p>
+            </main>
+        </div>
+
+        <footer class="border-t border-slate-800/80 px-5 py-3 text-xs text-slate-500 sm:px-6">
+            Self-hosted music discovery from IPTV and radio streams.
+        </footer>
+    </div>
+</div>
+</body>
+</html>

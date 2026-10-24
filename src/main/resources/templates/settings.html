@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" th:replace="~{layout :: page('Settings', ~{:: #content})}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main id="content" class="min-w-0 flex-1 px-5 py-6 sm:px-7">
+    <h1 class="text-xl font-semibold tracking-tight">Settings</h1>
+    <p class="mt-1 text-sm text-slate-400">Manage your IPTV playlist sources.</p>
+
+    <div th:if="${successMessage}" role="status"
+         class="mt-5 rounded-lg border border-emerald-800/60 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
+        <span th:text="${successMessage}">Done.</span>
+    </div>
+    <div th:if="${errorMessage}" role="alert"
+         class="mt-5 rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-200">
+        <span th:text="${errorMessage}">Something went wrong.</span>
+    </div>
+
+    <!-- Add by URL -->
+    <section class="mt-5 rounded-xl border border-slate-800/80 bg-slate-900/30 p-5">
+        <h2 class="text-sm font-semibold text-slate-100">Add playlist URL</h2>
+        <form th:action="@{/settings/sources/url}" th:object="${addUrlForm}" method="post" class="mt-4">
+            <div class="grid gap-3 sm:grid-cols-[1fr_minmax(0,14rem)]">
+                <div>
+                    <label class="sr-only" for="url">Playlist URL</label>
+                    <input id="url" type="url" th:field="*{url}" placeholder="https://example.com/playlist.m3u"
+                           th:errorclass="border-red-700"
+                           class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm
+                                  text-slate-100 placeholder:text-slate-600
+                                  focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-none">
+                    <p th:if="${#fields.hasErrors('url')}" th:errors="*{url}"
+                       class="mt-1.5 text-xs text-red-300">URL error</p>
+                </div>
+                <div>
+                    <label class="sr-only" for="urlName">Name</label>
+                    <input id="urlName" type="text" th:field="*{name}" placeholder="Name (optional)"
+                           th:errorclass="border-red-700"
+                           class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm
+                                  text-slate-100 placeholder:text-slate-600
+                                  focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-none">
+                    <p th:if="${#fields.hasErrors('name')}" th:errors="*{name}"
+                       class="mt-1.5 text-xs text-red-300">Name error</p>
+                </div>
+            </div>
+            <div class="mt-3 flex justify-end">
+                <button type="submit"
+                        class="rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white
+                               transition-colors hover:bg-emerald-500">
+                    Add URL
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <!-- Upload a file -->
+    <section class="mt-4 rounded-xl border border-slate-800/80 bg-slate-900/30 p-5">
+        <h2 class="text-sm font-semibold text-slate-100">Upload M3U file</h2>
+        <form th:action="@{/settings/sources/upload}" method="post" enctype="multipart/form-data" class="mt-4">
+            <!-- The whole dashed area is the label, so clicking anywhere in it opens the
+                 file picker without any script. -->
+            <label for="file"
+                   class="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg
+                          border border-dashed border-slate-700 px-4 py-7 text-center
+                          transition-colors hover:border-slate-600 hover:bg-slate-900/40">
+                <svg class="size-6 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.5" aria-hidden="true">
+                    <path d="M12 16V8m0 0-3 3m3-3 3 3"/>
+                    <path d="M20 16.5A3.5 3.5 0 0 0 18 10a6 6 0 0 0-11.6-1.5A4 4 0 0 0 6 16.9"/>
+                </svg>
+                <span class="text-sm text-slate-400">Choose .m3u or .m3u8 file</span>
+                <input id="file" name="file" type="file" accept=".m3u,.m3u8" required
+                       class="block w-full max-w-xs text-xs text-slate-400
+                              file:mr-3 file:rounded-md file:border-0 file:bg-slate-800 file:px-3 file:py-1.5
+                              file:text-xs file:text-slate-200 hover:file:bg-slate-700">
+            </label>
+            <div class="mt-3 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <label class="sr-only" for="fileName">Name</label>
+                <input id="fileName" name="name" type="text" maxlength="200" placeholder="Name (optional)"
+                       class="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm
+                              text-slate-100 placeholder:text-slate-600
+                              focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-none">
+                <button type="submit"
+                        class="rounded-lg bg-emerald-600 px-3.5 py-2 text-sm font-medium text-white
+                               transition-colors hover:bg-emerald-500">
+                    Upload
+                </button>
+            </div>
+        </form>
+    </section>
+
+    <!-- The list -->
+    <h2 class="mt-7 text-sm font-semibold text-slate-100">Added playlists</h2>
+
+    <p th:if="${#lists.isEmpty(sources)}"
+       class="mt-3 rounded-xl border border-slate-800/80 bg-slate-900/30 px-5 py-6 text-sm text-slate-400">
+        No playlist sources yet. Add a URL or upload a file above.
+    </p>
+
+    <ul th:unless="${#lists.isEmpty(sources)}"
+        class="mt-3 divide-y divide-slate-800/80 overflow-hidden rounded-xl border border-slate-800/80 bg-slate-900/30">
+        <li th:each="source : ${sources}" class="flex items-center gap-3 px-4 py-3.5">
+            <svg class="size-5 shrink-0 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.75" aria-hidden="true">
+                <path d="M3 6h10M3 11h10M3 16h6"/>
+                <circle cx="17" cy="17" r="2.5"/>
+                <path d="M19.5 17V8l2.5 1"/>
+            </svg>
+            <div class="min-w-0 flex-1">
+                <p class="truncate text-sm text-slate-100" th:text="${source.name}">Music TV</p>
+                <p class="mt-0.5 text-xs text-slate-500">
+                    <span th:text="${source.typeLabel}">URL</span>
+                    &middot;
+                    <span th:text="${source.addedOn}">Oct 24</span>
+                </p>
+            </div>
+            <form th:action="@{/settings/sources/{id}/remove(id=${source.id})}" method="post"
+                  onsubmit="return confirm('Remove this playlist source?')">
+                <button type="submit" th:aria-label="'Remove ' + ${source.name}"
+                        class="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-800 hover:text-red-300">
+                    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="1.75" aria-hidden="true">
+                        <path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/>
+                    </svg>
+                </button>
+            </form>
+        </li>
+    </ul>
+</main>
+</body>
+</html>

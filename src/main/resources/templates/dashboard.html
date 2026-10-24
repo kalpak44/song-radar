@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" th:replace="~{layout :: page('Dashboard', ~{:: #content})}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main id="content" class="min-w-0 flex-1 px-5 py-6 sm:px-7">
+    <h1 class="text-xl font-semibold tracking-tight">Dashboard</h1>
+    <p class="mt-1 text-sm text-slate-400">Welcome to SongRadar.</p>
+
+    <div class="mt-6 rounded-xl border border-slate-800/80 bg-slate-900/30 p-5">
+        <p class="text-sm text-pretty text-slate-300">
+            Add an IPTV or radio playlist to get started. Once a source is registered,
+            SongRadar can listen to its streams and identify the music that plays.
+        </p>
+        <a th:href="@{/settings}"
+           class="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-700 px-3 py-2
+                  text-sm text-slate-200 transition-colors hover:bg-slate-800">
+            Add a playlist source
+            <span aria-hidden="true">&rarr;</span>
+        </a>
+    </div>
+
+    <dl class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div class="rounded-xl border border-slate-800/80 bg-slate-900/30 p-4">
+            <dt class="text-sm font-medium text-slate-200">Listen</dt>
+            <dd class="mt-1 text-sm text-slate-400">Tune in to IPTV and radio streams.</dd>
+        </div>
+        <div class="rounded-xl border border-slate-800/80 bg-slate-900/30 p-4">
+            <dt class="text-sm font-medium text-slate-200">Identify</dt>
+            <dd class="mt-1 text-sm text-slate-400">Recognise each track as it plays.</dd>
+        </div>
+        <div class="rounded-xl border border-slate-800/80 bg-slate-900/30 p-4">
+            <dt class="text-sm font-medium text-slate-200">Collect</dt>
+            <dd class="mt-1 text-sm text-slate-400">Keep what you find in one library.</dd>
+        </div>
+    </dl>
+</main>
+</body>
+</html>

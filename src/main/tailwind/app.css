@@ -4,3 +4,42 @@
    sit outside src/main/tailwind, so they have to be registered explicitly or every class
    used in them is stripped from the build. */
 @source "../resources/templates";
+
+/* The range input is an invisible interaction layer over the storage meter. Its
+   thumb stays large enough for touch while the visible quota marker is rendered
+   separately, keeping the disk segments readable. */
+.quota-range {
+  appearance: none;
+  background: transparent;
+  cursor: ew-resize;
+}
+
+.quota-range::-webkit-slider-runnable-track {
+  height: 3rem;
+  background: transparent;
+}
+
+.quota-range::-webkit-slider-thumb {
+  width: 1.5rem;
+  height: 3rem;
+  appearance: none;
+  background: transparent;
+}
+
+.quota-range::-moz-range-track {
+  height: 3rem;
+  background: transparent;
+}
+
+.quota-range::-moz-range-thumb {
+  width: 1.5rem;
+  height: 3rem;
+  border: 0;
+  background: transparent;
+}
+
+.quota-range:focus-visible {
+  border-radius: 0.75rem;
+  outline: 2px solid rgb(52 211 153 / 0.7);
+  outline-offset: 2px;
+}

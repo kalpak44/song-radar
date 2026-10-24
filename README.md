@@ -3,8 +3,8 @@
 Self-hosted music discovery from IPTV and radio streams. Automatically identify songs, find available
 audio, and manage your personal music library.
 
-> **Status: initial scaffold.** Starts, connects to PostgreSQL and serves a homepage. No endpoints,
-> no auth, none of the music functionality yet.
+> **Status: early development.** Playlist sources and storage settings are available; channel
+> parsing, playback, recognition, library management, and authentication are still to come.
 
 Java 25 · Spring Boot 4.1 (Web MVC, Thymeleaf, Data JDBC) · PostgreSQL · Tailwind CSS 4
 
@@ -29,9 +29,12 @@ fails there rather than on the first page that reads from it.
 
 All environment variables, defaulted for local development in `.env.example`:
 `SONGRADAR_DB_HOST`, `SONGRADAR_DB_PORT`, `SONGRADAR_DB_NAME`, `SONGRADAR_DB_USERNAME`,
-`SONGRADAR_DB_PASSWORD`, `SONGRADAR_PORT`, `SONGRADAR_TEMPLATE_CACHE`.
+`SONGRADAR_DB_PASSWORD`, `SONGRADAR_PORT`, `SONGRADAR_TEMPLATE_CACHE`, and
+`SONGRADAR_STORAGE_PATH`.
 
 `SONGRADAR_DB_PASSWORD` has no default — a fallback password is one that reaches production unnoticed.
+`SONGRADAR_STORAGE_PATH` points at the writable mounted volume. The application defaults to `/data`
+for the cluster; `.env.example` selects `./data` for local development.
 
 ## Checks
 

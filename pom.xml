@@ -50,6 +50,29 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jdbc</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Spring Data JDBC never creates tables, so the schema is Flyway's.
+             Three artifacts, each needed: spring-boot-flyway carries the
+             auto-configuration, which Boot 4 moved out of the main jar — without it
+             flyway-core sits on the classpath and silently never runs; and the
+             postgresql module is separate from Flyway 10 onward. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
 
         <!-- Version comes from the Boot BOM, so a Boot upgrade moves the driver with it. -->
         <dependency>
