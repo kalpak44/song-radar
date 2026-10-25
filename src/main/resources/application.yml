@@ -41,7 +41,9 @@ songradar:
     capacity-gb: ${SONGRADAR_STORAGE_CAPACITY_GB:0}
     playlists: ${songradar.storage.path}/playlists
     recordings: ${songradar.storage.path}/recordings
-    library: ${songradar.storage.path}/library
+    # Downloaded tracks, one subfolder per listener. Separately overridable so a local run can
+    # point it at the browser's download folder and land files where the desktop expects them.
+    library: ${SONGRADAR_STORAGE_LIBRARY:${songradar.storage.path}/library}
   listeners:
     scheduler-threads: ${SONGRADAR_LISTENER_THREADS:2}
   recognition:

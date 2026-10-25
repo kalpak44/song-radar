@@ -88,6 +88,21 @@
             <version>0.2.5</version>
         </dependency>
 
+        <!-- Pure-Java LAME. Library downloads arrive as AAC and the image carries no
+             ffmpeg, so the encode has to happen in this process. -->
+        <dependency>
+            <groupId>de.sciss</groupId>
+            <artifactId>jump3r</artifactId>
+            <version>1.0.5</version>
+        </dependency>
+
+        <!-- Writes the ID3 tags on a downloaded track. -->
+        <dependency>
+            <groupId>com.mpatric</groupId>
+            <artifactId>mp3agic</artifactId>
+            <version>0.9.1</version>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

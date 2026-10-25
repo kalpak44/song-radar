@@ -77,7 +77,7 @@ public class SoundDetectionController {
       case PLANNED ->
           redirect.addFlashAttribute(
               "successMessage",
-              "Download plan logged. The current dummy downloader does not create a file yet.");
+              "Searched the music sources for that track. Check the listener's library folder.");
       case NOT_FOUND -> redirect.addFlashAttribute("errorMessage", "Detection not found.");
       case NOT_IDENTIFIED ->
           redirect.addFlashAttribute("errorMessage", "Only identified tracks can be downloaded.");

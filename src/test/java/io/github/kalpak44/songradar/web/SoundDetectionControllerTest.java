@@ -99,7 +99,7 @@ class SoundDetectionControllerTest {
             flash()
                 .attribute(
                     "successMessage",
-                    "Download plan logged. The current dummy downloader does not create a file yet."));
+                    "Searched the music sources for that track. Check the listener's library folder."));
   }
 
   @Test

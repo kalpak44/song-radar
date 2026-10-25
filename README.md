@@ -31,11 +31,13 @@ fails there rather than on the first page that reads from it.
 All environment variables, defaulted for local development in `.env.example`:
 `SONGRADAR_DB_HOST`, `SONGRADAR_DB_PORT`, `SONGRADAR_DB_NAME`, `SONGRADAR_DB_USERNAME`,
 `SONGRADAR_DB_PASSWORD`, `SONGRADAR_PORT`, `SONGRADAR_TEMPLATE_CACHE`, and
-`SONGRADAR_STORAGE_PATH`, `SONGRADAR_STORAGE_CAPACITY_GB`, `SONGRADAR_LISTENER_THREADS`, and the
-optional `SONGRADAR_AUDD_API_TOKEN`.
+`SONGRADAR_STORAGE_PATH`, `SONGRADAR_STORAGE_LIBRARY`, `SONGRADAR_STORAGE_CAPACITY_GB`,
+`SONGRADAR_LISTENER_THREADS`, and the optional `SONGRADAR_AUDD_API_TOKEN`.
 
 `SONGRADAR_DB_PASSWORD` has no default — a fallback password is one that reaches production unnoticed.
-`SONGRADAR_STORAGE_PATH` points at the writable mounted volume. The application defaults to `/data`
+`SONGRADAR_STORAGE_PATH` points at the writable mounted volume. `SONGRADAR_STORAGE_LIBRARY`
+overrides where downloaded tracks are filed — one subfolder per listener — and defaults to a
+`library` folder inside the storage path. The application defaults to `/data`
 for the cluster; `.env.example` selects `./data` for local development.
 `SONGRADAR_STORAGE_CAPACITY_GB` optionally supplies a logical capacity for storage such as NFS,
 where filesystem statistics describe the whole server rather than the application's volume.
