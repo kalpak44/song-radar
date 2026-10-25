@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
@@ -70,5 +71,22 @@ class StorageServiceTest {
     UncheckedIOException failure = assertThrows(UncheckedIOException.class, invalidRoot::snapshot);
 
     assertEquals("could not inspect the SongRadar storage volume", failure.getMessage());
+  }
+
+  @Test
+  void readsTheRetentionLimitFromTheSettingsRepository() {
+    when(settings.findRecordsPerListener()).thenReturn(12);
+
+    assertEquals(12, service.recordsPerListener());
+  }
+
+  @Test
+  void rejectsNegativeAndOverflowingLogicalCapacities() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new StorageService(root, new BigDecimal("-1"), settings));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new StorageService(root, new BigDecimal("999999999999999999999999999"), settings));
   }
 }

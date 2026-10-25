@@ -2,6 +2,7 @@ package io.github.kalpak44.songradar.web;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -28,6 +29,9 @@ import io.github.kalpak44.songradar.playlist.PlaylistSource;
 import io.github.kalpak44.songradar.playlist.PlaylistSourceService;
 import io.github.kalpak44.songradar.playlist.PlaylistUnavailableException;
 import io.github.kalpak44.songradar.playlist.SourceType;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -40,11 +44,13 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(PlaylistController.class)
 @Import(PlaylistControllerTest.ClockTestConfiguration.class)
+@TestPropertySource(properties = "songradar.storage.recordings=target/test-recordings")
 class PlaylistControllerTest {
 
   private static final Instant NOW = Instant.parse("2026-10-24T12:00:00Z");
@@ -265,6 +271,84 @@ class PlaylistControllerTest {
     mockMvc.perform(get("/playlists/99")).andExpect(status().isNotFound());
   }
 
+  @Test
+  void recordingAudioServesAValidatedRecording() throws Exception {
+    Path file = Path.of("target/test-recordings/4/7/recording.wav");
+    Files.createDirectories(file.getParent());
+    Files.writeString(file, "RIFF");
+    when(listeners.find(4L, 7L)).thenReturn(Optional.of(listener(ListenerStatus.ACTIVE)));
+    when(recordings.findById(14L)).thenReturn(Optional.of(recording(7L, "4/7/recording.wav")));
+
+    mockMvc.perform(get("/playlists/4/listeners/7/recordings/14/audio")).andExpect(status().isOk());
+  }
+
+  @Test
+  void recordingAudioRejectsARecordingFromAnotherListener() throws Exception {
+    when(listeners.find(4L, 7L)).thenReturn(Optional.of(listener(ListenerStatus.ACTIVE)));
+    when(recordings.findById(14L)).thenReturn(Optional.of(recording(8L, "4/8/recording.wav")));
+
+    mockMvc
+        .perform(get("/playlists/4/listeners/7/recordings/14/audio"))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void deleteRecordingReportsAStorageFailure() throws Exception {
+    ListenerRecording recording = recording(7L, "4/7/recording.wav");
+    when(listeners.find(4L, 7L)).thenReturn(Optional.of(listener(ListenerStatus.ACTIVE)));
+    when(recordings.findById(14L)).thenReturn(Optional.of(recording));
+    doThrow(new IOException("disk")).when(recordingService).delete(recording);
+
+    mockMvc
+        .perform(post("/playlists/4/listeners/7/recordings/14/delete"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/recordings?listenerId=7"))
+        .andExpect(flash().attribute("errorMessage", "Could not delete the recording file."));
+  }
+
+  @Test
+  void unknownChannelReturnsAFieldError() throws Exception {
+    when(channels.requireChannel(4L, "https://unknown.example/stream"))
+        .thenThrow(new IllegalArgumentException("Choose a channel from this playlist."));
+    when(channels.channels(4L)).thenReturn(List.of(CHANNEL));
+
+    mockMvc
+        .perform(
+            post("/playlists/4/listeners")
+                .param("name", "MTV Listener")
+                .param("channelUrl", "https://unknown.example/stream")
+                .param("intervalMinutes", "3")
+                .param("durationSeconds", "12"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("listener-detail"))
+        .andExpect(model().attributeHasFieldErrors("listenerForm", "channelUrl"));
+  }
+
+  @Test
+  void invalidUpdateRendersTheExistingListener() throws Exception {
+    when(listeners.find(4L, 7L)).thenReturn(Optional.of(listener(ListenerStatus.ACTIVE)));
+    when(channels.channels(4L)).thenReturn(List.of(CHANNEL));
+
+    mockMvc
+        .perform(
+            post("/playlists/4/listeners/7")
+                .param("name", "MTV Listener")
+                .param("channelUrl", CHANNEL.streamUrl())
+                .param("intervalMinutes", "1")
+                .param("durationSeconds", "60"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("listener-detail"))
+        .andExpect(model().attribute("editing", true))
+        .andExpect(model().attributeHasFieldErrors("listenerForm", "durationSeconds"));
+  }
+
+  @Test
+  void missingListenerReturnsNotFound() throws Exception {
+    when(listeners.find(4L, 99L)).thenReturn(Optional.empty());
+
+    mockMvc.perform(get("/playlists/4/listeners/99")).andExpect(status().isNotFound());
+  }
+
   private static PlaylistSource playlist() {
     return new PlaylistSource(4L, "Music TV", SourceType.URL, "https://e.com/list.m3u", null, NOW);
   }
@@ -283,6 +367,19 @@ class PlaylistControllerTest {
         NOW,
         null,
         status == ListenerStatus.ACTIVE ? NOW.plusSeconds(180) : null);
+  }
+
+  private static ListenerRecording recording(long listenerId, String filePath) {
+    return new ListenerRecording(
+        14L,
+        listenerId,
+        filePath,
+        NOW.minusSeconds(60),
+        NOW.minusSeconds(48),
+        RecordingStatus.COMPLETED,
+        1200,
+        12_000,
+        null);
   }
 
   @TestConfiguration

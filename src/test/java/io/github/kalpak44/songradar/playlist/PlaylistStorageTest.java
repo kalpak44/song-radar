@@ -3,9 +3,11 @@ package io.github.kalpak44.songradar.playlist;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -66,6 +68,16 @@ class PlaylistStorageTest {
     }
     org.junit.jupiter.api.Assertions.assertThrows(
         IllegalArgumentException.class, () -> storage.open("../outside.m3u"));
+  }
+
+  @Test
+  void wrapsFilesystemFailures() throws Exception {
+    Path fileInsteadOfDirectory = Files.writeString(root.resolve("not-a-directory"), "x");
+    PlaylistStorage storage = new PlaylistStorage(fileInsteadOfDirectory);
+
+    assertThrows(UncheckedIOException.class, () -> storage.store(stream("x"), "a.m3u"));
+    assertThrows(UncheckedIOException.class, () -> storage.delete("a.m3u"));
+    assertThrows(UncheckedIOException.class, () -> storage.open("a.m3u"));
   }
 
   private static ByteArrayInputStream stream(String content) {

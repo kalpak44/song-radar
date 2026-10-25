@@ -12,8 +12,11 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 class PlaylistChannelServiceTest {
+
+  @TempDir java.nio.file.Path root;
 
   private PlaylistSourceRepository sources;
   private PlaylistStorage storage;
@@ -63,6 +66,32 @@ class PlaylistChannelServiceTest {
         assertThrows(PlaylistUnavailableException.class, () -> service.channels(9L));
 
     assertEquals("That playlist no longer exists.", failure.getMessage());
+  }
+
+  @Test
+  void loadsADirectUrlPlaylist() throws Exception {
+    java.nio.file.Path playlist = root.resolve("remote.m3u");
+    java.nio.file.Files.writeString(playlist, "#EXTM3U\n#EXTINF:-1,MTV Hits\nhttps://e.com/mtv");
+    PlaylistSource source =
+        PlaylistSource.ofUrl("Remote", playlist.toUri().toString(), Instant.now());
+    when(sources.findById(1L)).thenReturn(Optional.of(source));
+
+    assertEquals(
+        List.of(new PlaylistChannel("MTV Hits", "https://e.com/mtv")), service.channels(1L));
+  }
+
+  @Test
+  void wrapsAnUnreadablePlaylist() {
+    PlaylistSource source =
+        PlaylistSource.ofFile("Local", "missing.m3u", Instant.parse("2026-10-24T12:00:00Z"));
+    when(sources.findById(1L)).thenReturn(Optional.of(source));
+    when(storage.open("missing.m3u"))
+        .thenThrow(new java.io.UncheckedIOException(new java.io.IOException("missing")));
+
+    PlaylistUnavailableException failure =
+        assertThrows(PlaylistUnavailableException.class, () -> service.channels(1L));
+
+    assertEquals("The playlist could not be loaded.", failure.getMessage());
   }
 
   private static ByteArrayInputStream stream(String value) {
