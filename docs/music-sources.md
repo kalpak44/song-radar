@@ -22,7 +22,9 @@ re-scrape separates an expired id from the site being unreachable. A stream requ
 frequently 404s on fetch, so every advertised variant is tried in turn rather than just the best one.
 
 **JioSaavn returns JSON labelled `text/html`,** which no message converter will touch — the body is
-read as text and parsed directly. Its media URL is DES-encrypted with a key the site itself ships.
+read as text and parsed directly. Its media URL is DES-encrypted, but the site's own
+`song.generateAuthToken` endpoint resolves the encrypted path to a signed URL, so the key never has
+to live in this application.
 
 **Audius is reached through a discovery node** rather than a fixed host; the registry at
 `api.audius.co` names the ones currently serving.
@@ -53,7 +55,7 @@ rate.
 ## Reference implementation
 
 <https://github.com/Shabinder/SpotiFlyer> solved the same problem and its providers are worth reading
-for the API shapes — the SoundCloud client-id scrape and the JioSaavn DES key both came from there.
+for the API shapes — the SoundCloud client-id scrape and the JioSaavn endpoint both came from there.
 Two of its paths are dead and should not be copied: `yt1s.com`, which it used for direct MP3, now
 answers 404, and YouTube's player endpoint rejects the mobile-client spoofs it relies on. SpotiFlyer
 shells out to ffmpeg for its conversion, which is not an option here — this application launches no

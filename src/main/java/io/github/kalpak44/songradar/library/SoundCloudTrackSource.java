@@ -31,6 +31,7 @@ public class SoundCloudTrackSource implements TrackSource {
   private static final Logger log = LoggerFactory.getLogger(SoundCloudTrackSource.class);
 
   private static final String API = "https://api-v2.soundcloud.com";
+  private static final String SITE = "https://soundcloud.com/";
   private static final String BROWSER_AGENT = "Mozilla/5.0";
   private static final Pattern ASSET =
       Pattern.compile("https://a-v2\\.sndcdn\\.com/assets/[^\"]+\\.js");
@@ -41,10 +42,20 @@ public class SoundCloudTrackSource implements TrackSource {
    */
   private static final List<String> LOSSLESSLY_DECODED = List.of("aac_160k", "aac_256k");
 
+  private final String api;
+  private final String site;
+  private final Pattern asset;
   private final RestClient client;
   private volatile String clientId;
 
   public SoundCloudTrackSource() {
+    this(API, SITE, ASSET);
+  }
+
+  SoundCloudTrackSource(String api, String site, Pattern asset) {
+    this.api = api;
+    this.site = site;
+    this.asset = asset;
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout(Duration.ofSeconds(10));
     requestFactory.setReadTimeout(Duration.ofSeconds(60));
@@ -81,7 +92,7 @@ public class SoundCloudTrackSource implements TrackSource {
       response =
           client
               .get()
-              .uri(API + "/search/tracks?q=" + query + "&limit=10&client_id=" + id)
+              .uri(api + "/search/tracks?q=" + query + "&limit=10&client_id=" + id)
               .retrieve()
               .body(SearchResponse.class);
     } catch (RuntimeException exception) {
@@ -243,7 +254,7 @@ public class SoundCloudTrackSource implements TrackSource {
     if (cached != null) {
       return cached;
     }
-    Matcher assets = ASSET.matcher(text("https://soundcloud.com/"));
+    Matcher assets = asset.matcher(text(site));
     List<String> scripts = new ArrayList<>();
     while (assets.find()) {
       scripts.add(assets.group());

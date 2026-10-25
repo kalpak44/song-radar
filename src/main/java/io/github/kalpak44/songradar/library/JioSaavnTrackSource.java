@@ -1,17 +1,14 @@
 package io.github.kalpak44.songradar.library;
 
 import java.io.IOException;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Base64;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import javax.crypto.Cipher;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.DESKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -34,12 +31,17 @@ public class JioSaavnTrackSource implements TrackSource {
 
   private static final String API = "https://www.jiosaavn.com/api.php";
   private static final String SEARCH =
-      API + "?__call=autocomplete.get&_format=json&_marker=0&cc=in&includeMetaTags=1&query=";
+      "?__call=autocomplete.get&_format=json&_marker=0&cc=in&includeMetaTags=1&query=";
   private static final String DETAILS =
-      API + "?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=";
+      "?__call=song.getDetails&cc=in&_marker=0%3F_marker%3D0&_format=json&pids=";
 
-  /** The key the site itself ships; the media URL is useless without it. */
-  private static final String MEDIA_KEY = "38346591";
+  /**
+   * The site hands out a signed, ready-to-use media URL when asked with the encrypted path. Doing
+   * that server-side keeps the vendor's legacy cipher out of this application entirely.
+   */
+  private static final String AUTH =
+      "?__call=song.generateAuthToken&bitrate=320&api_version=4&_format=json"
+          + "&ctx=web6dot0&xcountry=IN&_marker=0&url=";
 
   /**
    * The API labels its JSON responses text/html, so no message converter will touch them and the
@@ -47,9 +49,15 @@ public class JioSaavnTrackSource implements TrackSource {
    */
   private static final ObjectMapper JSON = JsonMapper.builder().build();
 
+  private final String api;
   private final RestClient client;
 
   public JioSaavnTrackSource() {
+    this(API);
+  }
+
+  JioSaavnTrackSource(String api) {
+    this.api = api;
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout(Duration.ofSeconds(10));
     requestFactory.setReadTimeout(Duration.ofSeconds(60));
@@ -68,12 +76,7 @@ public class JioSaavnTrackSource implements TrackSource {
   @Override
   public Optional<SourceTrack> find(String artist, String title) {
     try {
-      AutoComplete response =
-          JSON.readValue(
-              text(
-                  SEARCH
-                      + URLEncoder.encode((artist + " " + title).trim(), StandardCharsets.UTF_8)),
-              AutoComplete.class);
+      AutoComplete response = JSON.readValue(text(search(artist, title)), AutoComplete.class);
       if (response == null || response.songs() == null || response.songs().data() == null) {
         return Optional.empty();
       }
@@ -90,12 +93,21 @@ public class JioSaavnTrackSource implements TrackSource {
 
   private Optional<Details> details(String id) {
     Map<String, Details> response =
-        JSON.readValue(text(DETAILS + id), new TypeReference<Map<String, Details>>() {});
+        JSON.readValue(text(detailsUrl(id)), new TypeReference<Map<String, Details>>() {});
     return response == null ? Optional.empty() : Optional.ofNullable(response.get(id));
   }
 
+  private String search(String artist, String title) {
+    String query = URLEncoder.encode((artist + " " + title).trim(), StandardCharsets.UTF_8);
+    return api + SEARCH + query;
+  }
+
+  private String detailsUrl(String id) {
+    return api + DETAILS + id;
+  }
+
   private String text(String url) {
-    String body = client.get().uri(url).retrieve().body(String.class);
+    String body = client.get().uri(URI.create(url)).retrieve().body(String.class);
     return body == null ? "" : body;
   }
 
@@ -111,7 +123,7 @@ public class JioSaavnTrackSource implements TrackSource {
         details.primary_artists(),
         duration,
         out -> {
-          byte[] file = client.get().uri(media).retrieve().body(byte[].class);
+          byte[] file = client.get().uri(URI.create(media)).retrieve().body(byte[].class);
           if (file == null || file.length == 0) {
             throw new IOException("the track returned no audio");
           }
@@ -120,25 +132,21 @@ public class JioSaavnTrackSource implements TrackSource {
         });
   }
 
-  /** The URL is DES-encrypted in the response, and the bitrate is chosen by renaming the file. */
-  private static String mediaUrl(Details details) {
-    if (details.encrypted_media_url() == null || details.encrypted_media_url().isBlank()) {
-      throw new IllegalStateException("the track has no media URL");
+  /**
+   * The token endpoint signs an {@code _320.mp3} path while the CDN serves this catalogue's audio
+   * as AAC in an {@code _320.mp4} container under the same signature. Asking the site to resolve
+   * the encrypted path avoids implementing its DES scheme here.
+   */
+  String mediaUrl(Details details) {
+    if (details.encrypted_media_path() == null || details.encrypted_media_path().isBlank()) {
+      throw new IllegalStateException("the track has no media path");
     }
-    try {
-      Cipher cipher = Cipher.getInstance("DES/ECB/PKCS5Padding");
-      cipher.init(
-          Cipher.DECRYPT_MODE,
-          SecretKeyFactory.getInstance("DES")
-              .generateSecret(new DESKeySpec(MEDIA_KEY.getBytes(StandardCharsets.UTF_8))));
-      String url =
-          new String(
-              cipher.doFinal(Base64.getDecoder().decode(details.encrypted_media_url())),
-              StandardCharsets.UTF_8);
-      return url.replace("_96.mp4", "_320.mp4");
-    } catch (java.security.GeneralSecurityException exception) {
-      throw new IllegalStateException("the media URL could not be decrypted", exception);
+    String encoded = URLEncoder.encode(details.encrypted_media_path(), StandardCharsets.UTF_8);
+    AuthToken token = JSON.readValue(text(api + AUTH + encoded), AuthToken.class);
+    if (token == null || token.auth_url() == null || token.auth_url().isBlank()) {
+      throw new IllegalStateException("the track's media URL could not be authorised");
     }
+    return token.auth_url().replace("_320.mp3", "_320.mp4");
   }
 
   private static double score(Song song, String artist, String title) {
@@ -152,5 +160,7 @@ public class JioSaavnTrackSource implements TrackSource {
   record Song(String id, String title, String description) {}
 
   record Details(
-      String song, String primary_artists, String duration, String encrypted_media_url) {}
+      String song, String primary_artists, String duration, String encrypted_media_path) {}
+
+  record AuthToken(String auth_url) {}
 }

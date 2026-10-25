@@ -30,9 +30,15 @@ public class AudiusTrackSource implements TrackSource {
   private static final String APP = "songradar";
 
   private final RestClient client;
+  private final String registry;
   private volatile String host;
 
   public AudiusTrackSource() {
+    this(REGISTRY);
+  }
+
+  AudiusTrackSource(String registry) {
+    this.registry = registry;
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout(Duration.ofSeconds(10));
     requestFactory.setReadTimeout(Duration.ofSeconds(60));
@@ -100,11 +106,13 @@ public class AudiusTrackSource implements TrackSource {
     if (cached != null) {
       return cached;
     }
-    Registry registry = client.get().uri(REGISTRY).retrieve().body(Registry.class);
+    Registry registryResponse = client.get().uri(registry).retrieve().body(Registry.class);
     host =
-        registry == null || registry.data() == null || registry.data().isEmpty()
-            ? REGISTRY
-            : registry.data().getFirst();
+        registryResponse == null
+                || registryResponse.data() == null
+                || registryResponse.data().isEmpty()
+            ? registry
+            : registryResponse.data().getFirst();
     return host;
   }
 
