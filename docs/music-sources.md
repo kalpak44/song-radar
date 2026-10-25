@@ -11,6 +11,7 @@ stops working.
 | 2 | SoundCloud | undocumented | HLS: MPEG or AAC in fMP4 | only for the AAC variants |
 | 3 | JioSaavn | undocumented | progressive AAC in MP4 | always |
 | 4 | Bandcamp | undocumented | MP3 128 kbps | none |
+| 5 | YouTube (yt-dlp) | none — a subprocess | MP3, extracted by ffmpeg | done by yt-dlp |
 
 ## What breaks, and where to look
 
@@ -40,6 +41,32 @@ the matcher's marker list is for.
 
 **Audius is reached through a discovery node** rather than a fixed host; the registry at
 `api.audius.co` names the ones currently serving.
+
+## YouTube runs a subprocess, and that is a deliberate exception
+
+Nothing else reaches YouTube. Its own player endpoints answer `LOGIN_REQUIRED` or `ERROR` to every
+client — the mobile-client spoofs that SpotiFlyer relies on included — and the public mirrors are
+gone: Invidious instances answer 401, 403 or 530, and Piped is dead. The only route left is yt-dlp,
+which is a program, not a library. This application otherwise launches no processes, so the one that
+does is confined to this source and kept last in the chain: it is the slowest, and the only one that
+can be broken by something outside this repository.
+
+**It is paired with ffmpeg and cannot run without it.** The M4A stream YouTube serves needs a
+container fixup before anything can decode it — with `--fixup never` the file is rejected by this
+project's parser *and* by CoreAudio. Since ffmpeg has to be installed beside yt-dlp anyway, yt-dlp
+extracts the MP3 itself rather than handing AAC to the transcoder here.
+
+**A yt-dlp that is months old fails in a way that reads as a bug here.** Measured: version
+2026.03.17 lists formats and reports metadata perfectly, then fails the media download with
+`HTTP Error 403`. 2026.10.21 downloads the same track in about eleven seconds. Pin a recent build
+and move the pin; the scheduled source check is what reports it when it rots.
+
+**YouTube refuses datacenter addresses,** so this source is expected to be unavailable on a CI
+runner even when it works at home. Its probe in the source check is therefore reported but not
+asserted — a check that is permanently red is a check nobody reads.
+
+**Arguments are passed as a list, never through a shell.** The query is a title that came from a
+recognition provider, so quoting it into a command line would be an injection.
 
 ## HE-AAC is rejected, not ranked last
 

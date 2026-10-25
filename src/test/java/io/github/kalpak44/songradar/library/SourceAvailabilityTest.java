@@ -47,7 +47,13 @@ class SourceAvailabilityTest {
               new BandcampTrackSource(),
               List.of(
                   new String[] {"Amanda Palmer", "In My Mind"},
-                  new String[] {"Car Seat Headrest", "Something Soon"})));
+                  new String[] {"Car Seat Headrest", "Something Soon"})),
+          new Probe(
+              new YtDlpTrackSource("yt-dlp", "", 300),
+              List.of(
+                  new String[] {"Jonas Blue", "We Could Go Back"},
+                  new String[] {"Daft Punk", "Get Lucky"}),
+              false));
 
   /**
    * A non-ASCII query is encoded differently by every one of these clients, and getting it wrong
@@ -56,7 +62,16 @@ class SourceAvailabilityTest {
    */
   private static final String[] CYRILLIC = {"Кино", "Группа крови"};
 
-  record Probe(TrackSource source, List<String[]> queries) {}
+  /**
+   * {@code required} is false for a source that can fail for reasons this repository cannot fix —
+   * YouTube refuses datacenter addresses, so a runner is told to sign in. Its result is reported
+   * but does not fail the check, or the check would be red for ever and stop being read.
+   */
+  record Probe(TrackSource source, List<String[]> queries, boolean required) {
+    Probe(TrackSource source, List<String[]> queries) {
+      this(source, queries, true);
+    }
+  }
 
   @TempDir Path library;
 
@@ -71,8 +86,12 @@ class SourceAvailabilityTest {
         working.add(probe.source().name());
         System.out.printf("%-12s OK%n", probe.source().name());
       } else {
-        broken.add(probe.source().name());
-        System.out.printf("%-12s BROKEN — %s%n", probe.source().name(), outcome);
+        if (probe.required()) {
+          broken.add(probe.source().name());
+        }
+        System.out.printf(
+            "%-12s %s — %s%n",
+            probe.source().name(), probe.required() ? "BROKEN" : "unavailable", outcome);
       }
     }
 
