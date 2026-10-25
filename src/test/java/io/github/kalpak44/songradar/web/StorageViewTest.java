@@ -1,7 +1,6 @@
 package io.github.kalpak44.songradar.web;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.kalpak44.songradar.storage.StorageSnapshot;
 import java.nio.file.Path;
@@ -19,21 +18,18 @@ class StorageViewTest {
                 35_000_000_000L,
                 65_000_000_000L,
                 12_000_000_000L,
-                20_000_000_000L,
                 true));
 
     assertEquals("100 GB", view.total());
     assertEquals("35.0 GB", view.used());
-    assertEquals("12", view.songRadarGb());
     assertEquals("12.0", view.songRadarPercent());
     assertEquals("23.0", view.otherUsedPercent());
-    assertEquals("20.0", view.limitPercent());
     assertEquals(
         "Logical capacity configured for this SongRadar volume.", view.capacityDescription());
   }
 
   @Test
-  void reportsWhenExistingFilesExceedTheLimit() {
+  void formatsTerabyteCapacity() {
     StorageView view =
         StorageView.of(
             new StorageSnapshot(
@@ -42,21 +38,18 @@ class StorageViewTest {
                 500_000_000_000L,
                 1_500_000_000_000L,
                 30_000_000_000L,
-                20_000_000_000L,
                 false));
 
     assertEquals("2.0 TB", view.total());
-    assertTrue(view.exceedsLimit());
+    assertEquals("30.0 GB", view.songRadar());
   }
 
   @Test
   void anEmptyVolumeReportsZeroPercentages() {
-    StorageView view =
-        StorageView.of(new StorageSnapshot(Path.of("/data"), 0L, 0L, 0L, 0L, 0L, false));
+    StorageView view = StorageView.of(new StorageSnapshot(Path.of("/data"), 0L, 0L, 0L, 0L, false));
 
     assertEquals("0", view.usedPercent());
     assertEquals("0", view.songRadarPercent());
     assertEquals("0", view.otherUsedPercent());
-    assertEquals("0", view.limitPercent());
   }
 }

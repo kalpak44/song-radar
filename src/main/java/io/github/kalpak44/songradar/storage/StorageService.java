@@ -48,34 +48,21 @@ public class StorageService {
         available = fileStore.getUsableSpace();
         used = Math.max(0, total - available);
       }
-      long configuredLimit = settings.findLimitBytes().orElse(total);
-      long limit = Math.min(configuredLimit, total);
-      return new StorageSnapshot(root, total, used, available, songRadar, limit, logicalCapacity);
+      return new StorageSnapshot(root, total, used, available, songRadar, logicalCapacity);
     } catch (IOException e) {
       throw new UncheckedIOException("could not inspect the SongRadar storage volume", e);
     }
   }
 
-  public void saveLimit(BigDecimal gigabytes) {
-    long bytes;
-    try {
-      bytes =
-          gigabytes
-              .multiply(BYTES_PER_GB_DECIMAL)
-              .setScale(0, RoundingMode.HALF_UP)
-              .longValueExact();
-    } catch (ArithmeticException e) {
-      throw new IllegalArgumentException("Enter a valid storage limit.", e);
-    }
+  public int recordsPerListener() {
+    return settings.findRecordsPerListener();
+  }
 
-    long total = snapshot().totalBytes();
-    if (bytes <= 0) {
-      throw new IllegalArgumentException("The storage limit must be greater than zero.");
+  public void saveRecordsPerListener(int count) {
+    if (count < 1 || count > 1000) {
+      throw new IllegalArgumentException("Keep between 1 and 1,000 recordings per listener.");
     }
-    if (bytes > total) {
-      throw new IllegalArgumentException("The storage limit cannot exceed the volume capacity.");
-    }
-    settings.saveLimitBytes(bytes);
+    settings.saveRecordsPerListener(count);
   }
 
   private static long directorySize(Path directory) throws IOException {

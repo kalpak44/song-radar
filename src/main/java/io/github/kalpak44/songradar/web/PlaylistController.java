@@ -5,6 +5,7 @@ import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
 import io.github.kalpak44.songradar.listener.ListenerScheduler;
 import io.github.kalpak44.songradar.listener.ListenerService;
 import io.github.kalpak44.songradar.listener.PlaylistListener;
+import io.github.kalpak44.songradar.listener.RecordingService;
 import io.github.kalpak44.songradar.listener.RecordingStatus;
 import io.github.kalpak44.songradar.playlist.PlaylistChannel;
 import io.github.kalpak44.songradar.playlist.PlaylistChannelService;
@@ -45,6 +46,7 @@ public class PlaylistController {
   private final PlaylistChannelService channels;
   private final ListenerService listeners;
   private final ListenerRecordingRepository recordings;
+  private final RecordingService recordingService;
   private final ListenerScheduler scheduler;
   private final Path recordingsRoot;
   private final ZoneId zone;
@@ -54,6 +56,7 @@ public class PlaylistController {
       PlaylistChannelService channels,
       ListenerService listeners,
       ListenerRecordingRepository recordings,
+      RecordingService recordingService,
       ListenerScheduler scheduler,
       @Value("${songradar.storage.recordings}") Path recordingsRoot,
       Clock clock) {
@@ -61,6 +64,7 @@ public class PlaylistController {
     this.channels = channels;
     this.listeners = listeners;
     this.recordings = recordings;
+    this.recordingService = recordingService;
     this.scheduler = scheduler;
     this.recordingsRoot = recordingsRoot.toAbsolutePath().normalize();
     this.zone = clock.getZone();
@@ -69,9 +73,17 @@ public class PlaylistController {
   @GetMapping("/playlists/{playlistId}")
   public String detail(@PathVariable long playlistId, Model model) {
     PlaylistSource playlist = requirePlaylist(playlistId);
+    var playlistListeners = listeners.findAll(playlistId);
     model.addAttribute("activeNav", "settings");
     model.addAttribute("playlist", playlist);
-    model.addAttribute("listeners", ListenerView.of(listeners.findAll(playlistId), zone));
+    model.addAttribute(
+        "listeners",
+        playlistListeners.stream()
+            .map(
+                listener ->
+                    ListenerView.of(
+                        listener, zone, recordings.countCompletedByListenerId(listener.id())))
+            .toList());
     return "playlist-detail";
   }
 
@@ -106,6 +118,29 @@ public class PlaylistController {
     MediaType contentType =
         MediaTypeFactory.getMediaType(resource).orElse(MediaType.parseMediaType("audio/mpeg"));
     return ResponseEntity.ok().contentType(contentType).body(resource);
+  }
+
+  @PostMapping("/playlists/{playlistId}/listeners/{listenerId}/recordings/{recordingId}/delete")
+  public String deleteRecording(
+      @PathVariable long playlistId,
+      @PathVariable long listenerId,
+      @PathVariable long recordingId,
+      RedirectAttributes redirect) {
+    requirePlaylist(playlistId);
+    PlaylistListener listener = requireListener(playlistId, listenerId);
+    ListenerRecording recording =
+        recordings
+            .findById(recordingId)
+            .filter(
+                item -> item.listenerId() != null && item.listenerId().longValue() == listenerId)
+            .orElseThrow(this::notFound);
+    try {
+      recordingService.delete(recording);
+      redirect.addFlashAttribute(SUCCESS_MESSAGE, "Recording deleted and storage cleaned up.");
+    } catch (IOException e) {
+      redirect.addFlashAttribute("errorMessage", "Could not delete the recording file.");
+    }
+    return "redirect:/recordings?listenerId=" + listenerId;
   }
 
   @PostMapping("/playlists/{playlistId}/listeners")
@@ -211,12 +246,6 @@ public class PlaylistController {
     model.addAttribute("playlist", playlist);
     model.addAttribute("editing", listener != null);
     model.addAttribute("listenerId", listener == null ? null : listener.id());
-    if (listener != null) {
-      model.addAttribute(
-          "recordings",
-          RecordingView.of(
-              recordings.findAllByListenerIdOrderByStartedAtDesc(listener.id()), zone));
-    }
     if (!model.containsAttribute(LISTENER_FORM)) {
       model.addAttribute(LISTENER_FORM, form);
     }

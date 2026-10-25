@@ -7,7 +7,7 @@
         <div>
             <p class="text-xs font-medium uppercase tracking-[0.18em] text-emerald-400/80">Settings</p>
             <h1 class="mt-1 text-xl font-semibold tracking-tight">Music storage</h1>
-            <p class="mt-1 text-sm text-slate-400">Monitor the volume and set SongRadar's library ceiling.</p>
+            <p class="mt-1 text-sm text-slate-400">Monitor disk usage and manage automatic recording retention.</p>
         </div>
         <a th:href="@{/settings}" class="text-sm text-slate-400 transition-colors hover:text-slate-200">
             Playlist sources <span aria-hidden="true">&rarr;</span>
@@ -20,7 +20,7 @@
     </div>
     <div th:if="${errorMessage}" role="alert"
          class="mt-5 rounded-lg border border-red-900/60 bg-red-950/40 px-4 py-3 text-sm text-red-200">
-        <span th:text="${errorMessage}">The storage limit could not be saved.</span>
+        <span th:text="${errorMessage}">Recording retention could not be saved.</span>
     </div>
     <div th:if="${storageError}" role="alert"
          class="mt-5 rounded-xl border border-red-900/60 bg-red-950/30 px-5 py-5 text-sm text-red-200">
@@ -82,120 +82,64 @@
             </dl>
         </div>
 
-        <form th:action="@{/settings/storage}" th:object="${storageLimitForm}" method="post"
-              id="storage-limit-form" class="p-5 sm:p-6"
-              th:attr="data-total-gb=${storage.maxGb},data-songradar-gb=${storage.songRadarGb}">
-            <div class="flex flex-wrap items-start justify-between gap-3">
+        <section class="border-t border-slate-800/80 p-5 sm:p-6">
+            <div class="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                    <h2 class="text-base font-semibold">Music library limit</h2>
-                    <p class="mt-1 text-sm text-slate-400">Drag the marker or enter an exact capacity.</p>
+                    <h2 class="text-base font-semibold">Disk usage</h2>
+                    <p class="mt-1 text-sm text-slate-400">Usage is monitored here; storage capacity is not capped by SongRadar.</p>
                 </div>
-                <div class="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs text-slate-300">
-                    <span id="limit-badge" th:text="|${storage.limitGb} GB|">20 GB</span>
-                    <span class="text-slate-600"> / </span>
-                    <span id="limit-percent-badge" th:text="|${storage.limitPercent}%|">20%</span>
-                </div>
+                <p class="font-mono text-sm text-slate-300" th:text="|${storage.usedPercent}% used|">35% used</p>
             </div>
-
-            <div class="mt-6">
-                <div class="relative h-12" id="storage-meter">
-                    <div class="absolute inset-x-0 top-4 flex h-3 overflow-hidden rounded-full bg-slate-800 ring-1 ring-white/5">
-                        <div class="h-full bg-emerald-500" th:style="|width:${storage.songRadarPercent}%|"
-                             title="SongRadar files"></div>
-                        <div class="h-full bg-sky-300/90" th:style="|width:${storage.otherUsedPercent}%|"
-                             title="Other disk usage"></div>
-                    </div>
-                    <div id="limit-line" class="pointer-events-none absolute top-0 h-9 w-px bg-white/80 shadow-[0_0_10px_rgba(255,255,255,0.35)]"
-                         th:style="|left:${storage.limitPercent}%|">
-                        <span class="absolute -left-1.5 -top-0.5 size-3 rounded-full border-2 border-slate-950 bg-white"></span>
-                    </div>
-                    <input id="limit-range" type="range" min="0.1" step="0.1"
-                           th:max="${storage.maxGb}" th:value="${storage.limitGb}"
-                           aria-label="Music library limit in gigabytes" class="quota-range absolute inset-0 z-10 h-12 w-full">
-                </div>
-                <div class="flex justify-between text-[0.68rem] text-slate-500">
-                    <span>0 GB</span>
-                    <span th:text="${storage.total}">100 GB</span>
-                </div>
+            <div class="mt-4 flex h-3 overflow-hidden rounded-full bg-slate-800 ring-1 ring-white/5" role="img"
+                 th:attr="aria-label=|${storage.used} used of ${storage.total}|">
+                <span class="h-full bg-emerald-500" th:style="|width:${storage.songRadarPercent}%|" title="SongRadar files"></span>
+                <span class="h-full bg-sky-300/90" th:style="|width:${storage.otherUsedPercent}%|" title="Other disk usage"></span>
             </div>
-
-            <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-400">
+            <div class="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-400">
                 <span class="inline-flex items-center gap-1.5"><i class="size-2.5 rounded-sm bg-emerald-500"></i>SongRadar files</span>
                 <span class="inline-flex items-center gap-1.5"><i class="size-2.5 rounded-sm bg-sky-300"></i>Other disk usage</span>
                 <span class="inline-flex items-center gap-1.5"><i class="size-2.5 rounded-sm bg-slate-800 ring-1 ring-slate-700"></i>Available</span>
-                <span class="inline-flex items-center gap-1.5"><i class="h-3 w-px bg-white"></i>Configured limit</span>
             </div>
-
-            <div id="limit-warning" role="alert" th:classappend="${storage.exceedsLimit} ? '' : 'hidden'"
-                 class="mt-5 rounded-lg border border-amber-800/70 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
-                SongRadar files already exceed this limit. Existing files will not be deleted automatically.
-            </div>
-
-            <div class="mt-6 grid gap-4 border-t border-slate-800/80 pt-5 sm:grid-cols-[1fr_12rem_auto] sm:items-end">
-                <div>
-                    <p class="text-sm font-medium text-slate-200">Selected music limit</p>
-                    <p class="mt-1 text-xs text-slate-500">
-                        SongRadar currently occupies <span th:text="${storage.songRadar}">12 GB</span>.
-                        Quota enforcement will be added later.
-                    </p>
-                </div>
-                <div>
-                    <label for="limitGb" class="mb-1.5 block text-xs font-medium text-slate-400">Limit in GB</label>
-                    <div class="relative">
-                        <input id="limitGb" type="number" min="0.1" step="0.1" th:max="${storage.maxGb}"
-                               th:field="*{limitGb}" th:errorclass="border-red-700"
-                               class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 pr-10 font-mono
-                                      text-sm text-slate-100 focus:border-emerald-600 focus:ring-1
-                                      focus:ring-emerald-600 focus:outline-none">
-                        <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-slate-500">GB</span>
-                    </div>
-                    <p th:if="${#fields.hasErrors('limitGb')}" th:errors="*{limitGb}"
-                       class="mt-1.5 text-xs text-red-300">Limit error</p>
-                </div>
-                <button type="submit"
-                        class="rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-emerald-950
-                               transition hover:bg-emerald-400 focus:ring-2 focus:ring-emerald-400/60 focus:outline-none">
-                    Save limit
-                </button>
-            </div>
-        </form>
+        </section>
     </section>
 
-    <script th:if="${storage}" th:inline="javascript">
-        (() => {
-            const form = document.getElementById('storage-limit-form');
-            const range = document.getElementById('limit-range');
-            const number = document.getElementById('limitGb');
-            const line = document.getElementById('limit-line');
-            const valueBadge = document.getElementById('limit-badge');
-            const percentBadge = document.getElementById('limit-percent-badge');
-            const warning = document.getElementById('limit-warning');
-            const total = Number(form.dataset.totalGb);
-            const songRadar = Number(form.dataset.songradarGb);
-
-            const clamp = value => Math.min(total, Math.max(0.1, Number(value) || 0.1));
-            const render = value => {
-                const selected = clamp(value);
-                const percent = total > 0 ? selected / total * 100 : 0;
-                range.value = selected.toFixed(1);
-                line.style.left = `${Math.min(100, percent)}%`;
-                valueBadge.textContent = `${selected.toFixed(1).replace(/\.0$/, '')} GB`;
-                percentBadge.textContent = `${percent.toFixed(1)}%`;
-                warning.classList.toggle('hidden', songRadar <= selected);
-            };
-
-            range.addEventListener('input', () => {
-                number.value = Number(range.value).toFixed(1);
-                render(range.value);
-            });
-            number.addEventListener('input', () => render(number.value));
-            number.addEventListener('blur', () => {
-                number.value = clamp(number.value).toFixed(1);
-                render(number.value);
-            });
-            render(number.value);
-        })();
-    </script>
+    <section class="mt-5 rounded-2xl border border-slate-800/80 bg-slate-900/30 p-5 sm:p-6">
+        <div class="flex items-start gap-3">
+            <span class="grid size-9 shrink-0 place-items-center rounded-lg border border-slate-700 bg-slate-950/60 text-emerald-400" aria-hidden="true">
+                <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                    <path d="M4 12h4l2-6 4 12 2-6h4"/>
+                </svg>
+            </span>
+            <div>
+                <h2 class="text-base font-semibold">Recording retention</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-400">
+                    Keep the newest recordings for each listener. After a successful capture, SongRadar removes the oldest recordings first (FIFO).
+                </p>
+            </div>
+        </div>
+        <form th:action="@{/settings/storage/record-retention}" th:object="${recordRetentionForm}" method="post"
+              class="mt-5 grid gap-4 border-t border-slate-800/80 pt-5 sm:grid-cols-[1fr_10rem_auto] sm:items-end">
+            <div>
+                <p class="text-sm font-medium text-slate-200">Maximum saved recordings per listener</p>
+                <p class="mt-1 text-xs text-slate-500">When you lower this value, older items are pruned after that listener’s next successful capture.</p>
+            </div>
+            <div>
+                <label for="recordsPerListener" class="mb-1.5 block text-xs font-medium text-slate-400">Keep recordings</label>
+                <div class="relative">
+                    <input id="recordsPerListener" type="number" min="1" max="1000" step="1"
+                           th:field="*{recordsPerListener}" th:errorclass="border-red-700"
+                           class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 pr-16 font-mono text-sm text-slate-100 focus:border-emerald-600 focus:outline-none">
+                    <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-slate-500">items</span>
+                </div>
+                <p th:if="${#fields.hasErrors('recordsPerListener')}" th:errors="*{recordsPerListener}"
+                   class="mt-1.5 text-xs text-red-300">Retention error</p>
+            </div>
+            <button type="submit"
+                    class="rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-emerald-950 transition hover:bg-emerald-400 focus:ring-2 focus:ring-emerald-400/60 focus:outline-none">
+                Save retention
+            </button>
+        </form>
+    </section>
 </main>
 </body>
 </html>

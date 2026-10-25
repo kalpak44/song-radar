@@ -58,6 +58,17 @@
                     </svg>
                     Settings
                 </a>
+                <a th:href="@{/recordings}"
+                   th:classappend="${activeNav == 'recordings'}
+                       ? 'bg-slate-800/60 text-slate-100'
+                       : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'"
+                   class="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm whitespace-nowrap transition-colors">
+                    <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="1.75" aria-hidden="true">
+                        <path d="M4 10v4m4-7v10m4-14v18m4-14v10m4-7v4"/>
+                    </svg>
+                    Recordings
+                </a>
                 <a th:href="@{/settings/storage}"
                    th:classappend="${activeNav == 'storage'}
                        ? 'bg-slate-800/60 text-slate-100'

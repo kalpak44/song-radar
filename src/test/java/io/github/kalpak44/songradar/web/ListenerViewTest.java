@@ -17,13 +17,15 @@ class ListenerViewTest {
   @Test
   void formatsAnActiveScheduleAndRecordingTimes() {
     ListenerView view =
-        ListenerView.of(listener(ListenerStatus.ACTIVE, NOW, NOW.plusSeconds(180)), ZoneOffset.UTC);
+        ListenerView.of(
+            listener(ListenerStatus.ACTIVE, NOW, NOW.plusSeconds(180)), ZoneOffset.UTC, 6);
 
     assertTrue(view.active());
     assertEquals("Every 3 minutes", view.interval());
     assertEquals("12 seconds recording", view.duration());
     assertEquals("Oct 24, 12:00", view.lastRecording());
     assertEquals("Oct 24, 12:03", view.nextRecording());
+    assertEquals(6, view.recordingCount());
   }
 
   @Test

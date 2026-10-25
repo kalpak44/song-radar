@@ -63,14 +63,14 @@ class ListenerServiceTest {
   }
 
   @Test
-  void enableAndPauseSetTheNextRunConsistently() {
+  void reEnablingStartsNowAndPausingClearsTheNextRun() {
     PlaylistListener paused = service.setActive(listener(ListenerStatus.ACTIVE, null), false);
     assertEquals(ListenerStatus.PAUSED, paused.status());
     assertNull(paused.nextRecordingAt());
 
     PlaylistListener active = service.setActive(paused, true);
     assertEquals(ListenerStatus.ACTIVE, active.status());
-    assertEquals(NOW.plusSeconds(180), active.nextRecordingAt());
+    assertEquals(NOW, active.nextRecordingAt());
   }
 
   @Test

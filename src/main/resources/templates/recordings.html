@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en" th:replace="~{layout :: page('Recordings', ~{:: #content})}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main id="content" class="min-w-0 flex-1 px-5 py-6 sm:px-7 lg:px-10 lg:py-9">
+    <div class="mx-auto max-w-5xl">
+        <div class="relative overflow-hidden rounded-2xl border border-slate-800/90 bg-slate-900/35 p-6 sm:p-8">
+            <div class="pointer-events-none absolute -top-24 right-8 size-64 rounded-full bg-emerald-400/5 blur-3xl"></div>
+            <div class="relative flex flex-wrap items-end justify-between gap-5">
+                <div>
+                    <p class="font-mono text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-emerald-400/90">
+                        Capture library
+                    </p>
+                    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-50">Recordings</h1>
+                    <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">
+                        Listen to saved captures or remove old audio to free up SongRadar storage.
+                    </p>
+                </div>
+                <a th:href="@{/settings/storage}"
+                   class="rounded-lg border border-slate-700/80 px-3.5 py-2 text-sm text-slate-300 transition hover:border-emerald-700/70 hover:text-emerald-200">
+                    Storage settings <span aria-hidden="true">↗</span>
+                </a>
+            </div>
+        </div>
+
+        <div th:if="${successMessage}" role="status"
+             class="mt-5 rounded-xl border border-emerald-800/60 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">
+            <span th:text="${successMessage}">Recording deleted.</span>
+        </div>
+        <div th:if="${errorMessage}" role="alert"
+             class="mt-5 rounded-xl border border-red-900/70 bg-red-950/30 px-4 py-3 text-sm text-red-200">
+            <span th:text="${errorMessage}">Could not delete recording.</span>
+        </div>
+
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800/80 bg-slate-900/25 px-4 py-3">
+            <p class="text-sm text-slate-400">
+                <span class="font-mono text-slate-200" th:text="${totalRecordings}">0</span>
+                <span th:text="${totalRecordings == 1 ? ' recording' : ' recordings'}"> recordings</span>
+            </p>
+            <div class="flex flex-wrap items-center gap-2">
+                <form method="get" th:action="@{/recordings}" class="flex items-center gap-2">
+                    <input type="hidden" name="listenerId" th:if="${listenerFilter != null}" th:value="${listenerFilter}">
+                    <input type="hidden" name="playlistId" th:if="${playlistFilter != null}" th:value="${playlistFilter}">
+                    <input type="hidden" name="page" value="1">
+                    <label for="recording-sort" class="text-xs text-slate-500">Date</label>
+                    <select id="recording-sort" name="sort"
+                            class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200 focus:border-emerald-500 focus:outline-none">
+                        <option value="newest" th:selected="${sortOrder == 'newest'}">Newest first</option>
+                        <option value="oldest" th:selected="${sortOrder == 'oldest'}">Oldest first</option>
+                    </select>
+                    <button type="submit"
+                            class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-slate-500 hover:text-white">
+                        Sort
+                    </button>
+                </form>
+                <form th:if="${totalRecordings > 0}" method="post" th:action="@{/recordings/delete-all}"
+                      onsubmit="return confirm('Permanently delete every recording and its audio file? This cannot be undone.');">
+                    <button type="submit"
+                            class="inline-flex items-center gap-2 rounded-lg border border-red-900/70 bg-red-950/25 px-3 py-2 text-sm font-medium text-red-200 transition hover:border-red-700 hover:bg-red-950/60">
+                        <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                            <path d="M4 7h16M10 11v6m4-6v6M5.5 7l1 13h11l1-13M9 7V4h6v3"/>
+                        </svg>
+                        Delete all
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div th:if="${#lists.isEmpty(groups)}"
+             class="mt-7 rounded-2xl border border-dashed border-slate-800 bg-slate-900/15 px-6 py-16 text-center">
+            <span class="mx-auto grid size-12 place-items-center rounded-2xl border border-slate-800 bg-slate-950 text-emerald-300">
+                <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                    <path d="M4 10v4m4-7v10m4-14v18m4-14v10m4-7v4"/>
+                </svg>
+            </span>
+            <h2 class="mt-4 text-base font-medium text-slate-200">No recordings yet</h2>
+            <p class="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500">
+                Once a listener completes a capture, it will show up here with playback controls.
+            </p>
+            <a th:href="@{/settings}" class="mt-5 inline-flex text-sm font-medium text-emerald-300 hover:text-emerald-200">
+                Manage playlists <span class="ml-1" aria-hidden="true">→</span>
+            </a>
+        </div>
+
+        <div th:unless="${#lists.isEmpty(groups)}" class="mt-7 space-y-7">
+            <section th:each="group : ${groups}" class="overflow-hidden rounded-2xl border border-slate-800/90 bg-slate-900/20">
+                <header class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 bg-slate-900/45 px-5 py-4 sm:px-6">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <span class="grid size-10 shrink-0 place-items-center rounded-xl border border-emerald-900/50 bg-emerald-950/35 text-emerald-300">
+                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                                <circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.5"/><path d="M12 3.5v4m0 9v4m8.5-8.5h-4m-9 0h-4"/>
+                            </svg>
+                        </span>
+                        <div class="min-w-0">
+                            <h2 class="truncate text-base font-semibold text-slate-100" th:text="${group.listenerName}">Musicbox Listener</h2>
+                            <p class="mt-0.5 truncate text-xs text-slate-500">
+                                <span th:text="${group.channelName}">Musicbox 80s</span>
+                                <span aria-hidden="true"> · </span>
+                                <a class="transition hover:text-slate-300" th:href="@{/playlists/{id}(id=${group.playlistId})}" th:text="${group.playlistName}">Music TV</a>
+                            </p>
+                        </div>
+                    </div>
+                    <span class="rounded-full border border-slate-700/70 px-2.5 py-1 font-mono text-[0.68rem] text-slate-400"
+                          th:text="|${#lists.size(group.recordings)} captures|">3 captures</span>
+                </header>
+
+                <div class="divide-y divide-slate-800/70">
+                    <article th:each="recording : ${group.recordings}" class="px-5 py-5 sm:px-6">
+                        <div class="flex flex-wrap items-start justify-between gap-4">
+                            <div class="flex min-w-0 items-start gap-3">
+                                <span class="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-slate-950 text-emerald-300/90">
+                                    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                                        <path d="M4 10v4m4-7v10m4-14v18m4-14v10m4-7v4"/>
+                                    </svg>
+                                </span>
+                                <div class="min-w-0">
+                                    <h3 class="text-sm font-medium text-slate-200">
+                                        <time data-local-time="detailed" th:attr="datetime=${recording.recordedAtInstant}"
+                                              th:text="${recording.recordedAt}">Oct 25, 2026 · 10:15:00</time>
+                                    </h3>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        <span th:text="${recording.duration}">12 seconds</span>
+                                        <span aria-hidden="true"> · </span>
+                                        <span th:text="${recording.size}">384 KB</span>
+                                    </p>
+                                </div>
+                            </div>
+                            <form method="post"
+                                  th:action="@{/playlists/{playlistId}/listeners/{listenerId}/recordings/{recordingId}/delete(playlistId=${group.playlistId},listenerId=${group.listenerId},recordingId=${recording.id})}"
+                                  onsubmit="return confirm('Delete this recording and its audio file? This cannot be undone.');">
+                                <button type="submit" aria-label="Delete recording"
+                                        class="inline-flex items-center gap-2 rounded-lg border border-red-950/80 px-3 py-2 text-xs font-medium text-slate-400 transition hover:border-red-800/80 hover:bg-red-950/35 hover:text-red-200 focus-visible:outline-2 focus-visible:outline-red-400">
+                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                        <path d="M4 7h16M10 11v6m4-6v6M5.5 7l1 13h11l1-13M9 7V4h6v3"/>
+                                    </svg>
+                                    Delete
+                                </button>
+                            </form>
+                        </div>
+
+                        <audio th:if="${recording.playable}" controls preload="none"
+                               class="recording-player mt-4 w-full"
+                               th:src="@{/playlists/{playlistId}/listeners/{listenerId}/recordings/{recordingId}/audio(playlistId=${group.playlistId},listenerId=${group.listenerId},recordingId=${recording.id})}"
+                               aria-label="Listen to this recording">
+                            Your browser does not support audio playback.
+                        </audio>
+                        <p th:unless="${recording.playable}" class="mt-3 rounded-lg bg-amber-950/20 px-3 py-2 text-xs text-amber-200/80"
+                           th:text="${recording.errorMessage}">The stream was unavailable.</p>
+                    </article>
+                </div>
+            </section>
+        </div>
+
+        <nav th:if="${totalPages > 1}" aria-label="Recordings pages"
+             class="mt-7 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800/80 bg-slate-900/20 px-4 py-3">
+            <p class="text-xs text-slate-500">
+                Showing
+                <span class="font-mono text-slate-300" th:text="${firstRecordNumber}">1</span>–
+                <span class="font-mono text-slate-300" th:text="${lastRecordNumber}">25</span>
+                of <span class="font-mono text-slate-300" th:text="${totalRecordings}">100</span>
+            </p>
+            <div class="flex items-center gap-2">
+                <a th:if="${currentPage > 1}"
+                   th:href="@{/recordings(page=${currentPage - 1},sort=${sortOrder},listenerId=${listenerFilter},playlistId=${playlistFilter})}"
+                   class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-slate-500 hover:text-white">Previous</a>
+                <span th:unless="${currentPage > 1}"
+                      class="rounded-lg border border-slate-800 px-3 py-2 text-sm text-slate-600">Previous</span>
+                <span class="px-2 font-mono text-xs text-slate-400" th:text="|${currentPage} / ${totalPages}|">1 / 4</span>
+                <a th:if="${currentPage < totalPages}"
+                   th:href="@{/recordings(page=${currentPage + 1},sort=${sortOrder},listenerId=${listenerFilter},playlistId=${playlistFilter})}"
+                   class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 transition hover:border-slate-500 hover:text-white">Next</a>
+                <span th:unless="${currentPage < totalPages}"
+                      class="rounded-lg border border-slate-800 px-3 py-2 text-sm text-slate-600">Next</span>
+            </div>
+        </nav>
+    </div>
+</main>
+</body>
+</html>

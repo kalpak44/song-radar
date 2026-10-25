@@ -25,13 +25,12 @@ public record RecordingView(
     return recordings.stream().map(recording -> of(recording, zone)).toList();
   }
 
-  private static RecordingView of(ListenerRecording recording, ZoneId zone) {
-    Duration elapsed = Duration.between(recording.startedAt(), recording.completedAt());
+  public static RecordingView of(ListenerRecording recording, ZoneId zone) {
     return new RecordingView(
         recording.id(),
         TIME.format(recording.startedAt().atZone(zone)),
         recording.startedAt(),
-        formatDuration(elapsed),
+        formatDuration(Duration.ofMillis(recording.durationMillis())),
         formatSize(recording.sizeBytes()),
         recording.status() == RecordingStatus.COMPLETED && recording.filePath() != null,
         recording.errorMessage());

@@ -13,10 +13,16 @@ public record ListenerRecording(
     Instant completedAt,
     RecordingStatus status,
     long sizeBytes,
+    long durationMillis,
     String errorMessage) {
 
   public static ListenerRecording completed(
-      long listenerId, String filePath, Instant startedAt, Instant completedAt, long sizeBytes) {
+      long listenerId,
+      String filePath,
+      Instant startedAt,
+      Instant completedAt,
+      long sizeBytes,
+      long durationMillis) {
     return new ListenerRecording(
         null,
         listenerId,
@@ -25,12 +31,13 @@ public record ListenerRecording(
         completedAt,
         RecordingStatus.COMPLETED,
         sizeBytes,
+        durationMillis,
         null);
   }
 
   public static ListenerRecording failed(
       long listenerId, Instant startedAt, Instant completedAt, String errorMessage) {
     return new ListenerRecording(
-        null, listenerId, null, startedAt, completedAt, RecordingStatus.FAILED, 0, errorMessage);
+        null, listenerId, null, startedAt, completedAt, RecordingStatus.FAILED, 0, 0, errorMessage);
   }
 }

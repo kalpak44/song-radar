@@ -1,6 +1,5 @@
 package io.github.kalpak44.songradar.listener;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -36,23 +35,48 @@ class StreamRecordingClientTest {
   }
 
   @Test
-  void capturesHttpAudioAndChoosesAnExtensionFromItsContentType() throws Exception {
-    byte[] audio = {1, 2, 3, 4};
+  void followsMasterPlaylistAndRejectsUndecodableTransportInsteadOfSavingAPlaylistAsAudio()
+      throws Exception {
+    byte[] invalidTransport = {1, 2, 3, 4};
     server.createContext(
-        "/stream",
+        "/master.m3u8",
         exchange -> {
-          exchange.getResponseHeaders().add("Content-Type", "audio/mpeg");
-          exchange.sendResponseHeaders(200, audio.length);
-          exchange.getResponseBody().write(audio);
+          byte[] body = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=128000\nmedia/list.m3u8\n".getBytes();
+          exchange.getResponseHeaders().add("Content-Type", "application/vnd.apple.mpegurl");
+          exchange.sendResponseHeaders(200, body.length);
+          exchange.getResponseBody().write(body);
+          exchange.close();
+        });
+    server.createContext(
+        "/media/list.m3u8",
+        exchange -> {
+          byte[] body = "#EXTM3U\n#EXTINF:4.0,\nsegment.ts\n#EXT-X-ENDLIST\n".getBytes();
+          exchange.getResponseHeaders().add("Content-Type", "application/vnd.apple.mpegurl");
+          exchange.sendResponseHeaders(200, body.length);
+          exchange.getResponseBody().write(body);
+          exchange.close();
+        });
+    server.createContext(
+        "/media/segment.ts",
+        exchange -> {
+          assertTrue(exchange.getRequestURI().getQuery().contains("token=abc"));
+          exchange.sendResponseHeaders(200, invalidTransport.length);
+          exchange.getResponseBody().write(invalidTransport);
           exchange.close();
         });
     server.start();
 
-    Path file =
-        client.capture(uri("/stream"), root.resolve("recordings"), "sample", Duration.ofSeconds(1));
-
-    assertTrue(file.getFileName().toString().endsWith(".mp3"));
-    assertArrayEquals(audio, Files.readAllBytes(file));
+    assertThrows(
+        IOException.class,
+        () ->
+            client.capture(
+                URI.create(uri("/master.m3u8").toString() + "?token=abc"),
+                root,
+                "sample",
+                Duration.ofSeconds(1)));
+    assertTrue(Files.notExists(root.resolve("sample.wav")));
+    assertTrue(Files.notExists(root.resolve("sample.wav.part")));
+    assertTrue(Files.notExists(root.resolve("sample.ts.part")));
   }
 
   @Test
@@ -62,22 +86,6 @@ class StreamRecordingClientTest {
         () ->
             client.capture(
                 URI.create("file:///tmp/audio.mp3"), root, "sample", Duration.ofSeconds(1)));
-  }
-
-  @Test
-  void emptyResponseIsReportedAndItsPartialFileIsRemoved() throws Exception {
-    server.createContext(
-        "/empty",
-        exchange -> {
-          exchange.sendResponseHeaders(200, -1);
-          exchange.close();
-        });
-    server.start();
-
-    assertThrows(
-        IOException.class,
-        () -> client.capture(uri("/empty"), root, "empty", Duration.ofSeconds(1)));
-    assertTrue(Files.notExists(root.resolve("empty.part")));
   }
 
   private URI uri(String path) {

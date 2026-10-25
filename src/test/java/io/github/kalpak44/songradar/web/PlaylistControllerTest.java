@@ -14,11 +14,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
 import io.github.kalpak44.songradar.listener.ListenerScheduler;
 import io.github.kalpak44.songradar.listener.ListenerService;
 import io.github.kalpak44.songradar.listener.ListenerStatus;
 import io.github.kalpak44.songradar.listener.PlaylistListener;
+import io.github.kalpak44.songradar.listener.RecordingService;
+import io.github.kalpak44.songradar.listener.RecordingStatus;
 import io.github.kalpak44.songradar.playlist.PlaylistChannel;
 import io.github.kalpak44.songradar.playlist.PlaylistChannelService;
 import io.github.kalpak44.songradar.playlist.PlaylistSource;
@@ -53,6 +56,7 @@ class PlaylistControllerTest {
   @MockitoBean private PlaylistChannelService channels;
   @MockitoBean private ListenerService listeners;
   @MockitoBean private ListenerRecordingRepository recordings;
+  @MockitoBean private RecordingService recordingService;
   @MockitoBean private ListenerScheduler scheduler;
 
   @BeforeEach
@@ -63,6 +67,7 @@ class PlaylistControllerTest {
   @Test
   void detailRendersListenerStatusAndSchedule() throws Exception {
     when(listeners.findAll(4L)).thenReturn(List.of(listener(ListenerStatus.ACTIVE)));
+    when(recordings.countCompletedByListenerId(7L)).thenReturn(6L);
 
     mockMvc
         .perform(get("/playlists/4"))
@@ -70,7 +75,8 @@ class PlaylistControllerTest {
         .andExpect(view().name("playlist-detail"))
         .andExpect(model().attribute("activeNav", "settings"))
         .andExpect(content().string(containsString("MTV Listener")))
-        .andExpect(content().string(containsString("Next recording")));
+        .andExpect(content().string(containsString("Next recording")))
+        .andExpect(content().string(containsString("6 saved")));
   }
 
   @Test
@@ -223,6 +229,33 @@ class PlaylistControllerTest {
 
     verify(scheduler).cancel(7L);
     verify(listeners).delete(listener);
+  }
+
+  @Test
+  void deleteRecordingRemovesItsFileAndRedirectsToTheFilteredLibrary() throws Exception {
+    when(listeners.find(4L, 7L)).thenReturn(Optional.of(listener(ListenerStatus.ACTIVE)));
+    when(recordings.findById(14L))
+        .thenReturn(
+            Optional.of(
+                new ListenerRecording(
+                    14L,
+                    7L,
+                    "4/7/recording.wav",
+                    NOW.minusSeconds(60),
+                    NOW.minusSeconds(48),
+                    RecordingStatus.COMPLETED,
+                    1200,
+                    12_000,
+                    null)));
+
+    mockMvc
+        .perform(post("/playlists/4/listeners/7/recordings/14/delete"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/recordings?listenerId=7"))
+        .andExpect(
+            flash().attribute("successMessage", "Recording deleted and storage cleaned up."));
+
+    verify(recordingService).delete(any(ListenerRecording.class));
   }
 
   @Test

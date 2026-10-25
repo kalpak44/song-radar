@@ -52,7 +52,10 @@
             <div class="flex items-center justify-between gap-3">
                 <div>
                     <h2 class="text-base font-semibold">Listeners</h2>
-                    <p class="mt-1 text-sm text-slate-500">Recording schedules attached to this playlist.</p>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Recording schedules attached to this playlist. Retention is configured in
+                        <a th:href="@{/settings/storage}" class="text-emerald-300 transition hover:text-emerald-200">Storage settings</a>.
+                    </p>
                 </div>
                 <span class="rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1 font-mono text-xs text-slate-400"
                       th:text="|${#lists.size(listeners)} configured|">2 configured</span>
@@ -99,7 +102,7 @@
                         </span>
                     </div>
 
-                    <div class="mt-5 grid grid-cols-2 gap-3 border-y border-slate-800/80 py-4 text-xs sm:grid-cols-4">
+                    <div class="mt-5 grid grid-cols-2 gap-3 border-y border-slate-800/80 py-4 text-xs sm:grid-cols-5">
                         <div>
                             <p class="text-slate-600">Frequency</p>
                             <p class="mt-1 text-slate-300" th:text="${listener.interval}">Every 3 minutes</p>
@@ -107,6 +110,10 @@
                         <div>
                             <p class="text-slate-600">Duration</p>
                             <p class="mt-1 text-slate-300" th:text="${listener.duration}">12 seconds</p>
+                        </div>
+                        <div>
+                            <p class="text-slate-600">Saved records</p>
+                            <p class="mt-1 text-slate-300" th:text="|${listener.recordingCount} saved|">4 saved</p>
                         </div>
                         <div>
                             <p class="text-slate-600">Last recording</p>

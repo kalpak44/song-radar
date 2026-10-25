@@ -22,6 +22,10 @@ public class ListenerService {
     return listeners.findAllByPlaylistSourceIdOrderByCreatedAtAsc(playlistId);
   }
 
+  public List<PlaylistListener> findAll() {
+    return listeners.findAll();
+  }
+
   public Optional<PlaylistListener> find(long playlistId, long listenerId) {
     return listeners.findByIdAndPlaylistSourceId(listenerId, playlistId);
   }
@@ -91,7 +95,7 @@ public class ListenerService {
             existing.createdAt(),
             now,
             existing.lastRecordingAt(),
-            active ? now.plusSeconds(existing.recordingIntervalSeconds()) : null));
+            active ? now : null));
   }
 
   public void delete(PlaylistListener listener) {

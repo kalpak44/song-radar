@@ -1,7 +1,7 @@
 package io.github.kalpak44.songradar.web;
 
 import io.github.kalpak44.songradar.storage.StorageService;
-import io.github.kalpak44.songradar.web.form.StorageLimitForm;
+import io.github.kalpak44.songradar.web.form.RecordRetentionForm;
 import jakarta.validation.Valid;
 import java.io.UncheckedIOException;
 import org.springframework.dao.DataAccessException;
@@ -18,11 +18,11 @@ public class StorageSettingsController {
 
   private static final String REDIRECT_STORAGE = "redirect:/settings/storage";
   private static final String STORAGE = "storage";
-  private static final String STORAGE_LIMIT_FORM = "storageLimitForm";
+  private static final String RECORD_RETENTION_FORM = "recordRetentionForm";
   private static final String SUCCESS_MESSAGE = "successMessage";
   private static final String ERROR_MESSAGE = "errorMessage";
-  private static final String BINDING_RESULT_STORAGE_LIMIT_FORM =
-      "org.springframework.validation.BindingResult." + STORAGE_LIMIT_FORM;
+  private static final String BINDING_RESULT_RECORD_RETENTION_FORM =
+      "org.springframework.validation.BindingResult." + RECORD_RETENTION_FORM;
 
   private final StorageService storageService;
 
@@ -36,44 +36,49 @@ public class StorageSettingsController {
     try {
       StorageView view = StorageView.of(storageService.snapshot());
       model.addAttribute(STORAGE, view);
-      if (!model.containsAttribute(STORAGE_LIMIT_FORM)) {
-        StorageLimitForm form = new StorageLimitForm();
-        form.setLimitGb(new java.math.BigDecimal(view.limitGb()));
-        model.addAttribute(STORAGE_LIMIT_FORM, form);
-      }
     } catch (UncheckedIOException | DataAccessException _) {
       model.addAttribute(
           "storageError",
           "Storage information is temporarily unavailable. Check the configured path.");
     }
+    if (!model.containsAttribute(RECORD_RETENTION_FORM)) {
+      RecordRetentionForm form = new RecordRetentionForm();
+      try {
+        form.setRecordsPerListener(storageService.recordsPerListener());
+      } catch (DataAccessException _) {
+        model.addAttribute(
+            "storageError", "Storage settings are temporarily unavailable. Try again shortly.");
+      }
+      model.addAttribute(RECORD_RETENTION_FORM, form);
+    }
     return STORAGE;
   }
 
-  @PostMapping("/settings/storage")
+  @PostMapping("/settings/storage/record-retention")
   public String save(
-      @Valid @ModelAttribute(STORAGE_LIMIT_FORM) StorageLimitForm form,
+      @Valid @ModelAttribute(RECORD_RETENTION_FORM) RecordRetentionForm form,
       BindingResult binding,
       RedirectAttributes redirect) {
     if (binding.hasErrors()) {
       preserveValidation(binding, form, redirect);
     } else {
       try {
-        storageService.saveLimit(form.getLimitGb());
-        redirect.addFlashAttribute(SUCCESS_MESSAGE, "Storage limit saved.");
+        storageService.saveRecordsPerListener(form.getRecordsPerListener());
+        redirect.addFlashAttribute(SUCCESS_MESSAGE, "Recording retention saved.");
       } catch (IllegalArgumentException e) {
-        binding.rejectValue("limitGb", "limit.invalid", e.getMessage());
+        binding.rejectValue("recordsPerListener", "retention.invalid", e.getMessage());
         preserveValidation(binding, form, redirect);
       } catch (UncheckedIOException | DataAccessException _) {
         redirect.addFlashAttribute(
-            ERROR_MESSAGE, "The storage limit could not be saved. Try again.");
+            ERROR_MESSAGE, "Recording retention could not be saved. Try again.");
       }
     }
     return REDIRECT_STORAGE;
   }
 
   private static void preserveValidation(
-      BindingResult binding, StorageLimitForm form, RedirectAttributes redirect) {
-    redirect.addFlashAttribute(BINDING_RESULT_STORAGE_LIMIT_FORM, binding);
-    redirect.addFlashAttribute(STORAGE_LIMIT_FORM, form);
+      BindingResult binding, RecordRetentionForm form, RedirectAttributes redirect) {
+    redirect.addFlashAttribute(BINDING_RESULT_RECORD_RETENTION_FORM, binding);
+    redirect.addFlashAttribute(RECORD_RETENTION_FORM, form);
   }
 }

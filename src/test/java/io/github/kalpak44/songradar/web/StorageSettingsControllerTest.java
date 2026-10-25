@@ -1,7 +1,6 @@
 package io.github.kalpak44.songradar.web;
 
 import static org.hamcrest.Matchers.containsString;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -16,7 +15,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.github.kalpak44.songradar.storage.StorageService;
 import io.github.kalpak44.songradar.storage.StorageSnapshot;
-import java.math.BigDecimal;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +32,7 @@ class StorageSettingsControllerTest {
   @Test
   void pageRendersMetricsAndMarksStorageNavigationActive() throws Exception {
     when(storageService.snapshot()).thenReturn(snapshot());
+    when(storageService.recordsPerListener()).thenReturn(20);
 
     mockMvc
         .perform(get("/settings/storage"))
@@ -41,7 +40,10 @@ class StorageSettingsControllerTest {
         .andExpect(view().name("storage"))
         .andExpect(model().attribute("activeNav", "storage"))
         .andExpect(content().string(containsString("Music storage")))
-        .andExpect(content().string(containsString("/data/music")));
+        .andExpect(content().string(containsString("/data/music")))
+        .andExpect(content().string(containsString("Recording retention")))
+        .andExpect(content().string(containsString("Maximum saved recordings per listener")))
+        .andExpect(content().string(org.hamcrest.Matchers.not(containsString("Limit in GB"))));
   }
 
   @Test
@@ -59,56 +61,59 @@ class StorageSettingsControllerTest {
   }
 
   @Test
-  void validLimitIsSavedWithAFormPost() throws Exception {
+  void validRetentionIsSavedWithAFormPost() throws Exception {
     mockMvc
-        .perform(post("/settings/storage").param("limitGb", "20"))
+        .perform(post("/settings/storage/record-retention").param("recordsPerListener", "12"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/settings/storage"))
-        .andExpect(flash().attribute("successMessage", "Storage limit saved."));
+        .andExpect(flash().attribute("successMessage", "Recording retention saved."));
 
-    verify(storageService).saveLimit(new BigDecimal("20"));
+    verify(storageService).saveRecordsPerListener(12);
   }
 
   @Test
-  void invalidLimitReturnsValidationFeedback() throws Exception {
+  void invalidRetentionReturnsValidationFeedback() throws Exception {
     mockMvc
-        .perform(post("/settings/storage").param("limitGb", "0"))
+        .perform(post("/settings/storage/record-retention").param("recordsPerListener", "0"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/settings/storage"))
-        .andExpect(flash().attributeExists("storageLimitForm"))
+        .andExpect(flash().attributeExists("recordRetentionForm"))
         .andExpect(
             flash()
-                .attributeExists("org.springframework.validation.BindingResult.storageLimitForm"));
+                .attributeExists(
+                    "org.springframework.validation.BindingResult.recordRetentionForm"));
   }
 
   @Test
   void serviceValidationFailureIsReturnedToTheForm() throws Exception {
-    doThrow(new IllegalArgumentException("The storage limit cannot exceed the volume capacity."))
+    doThrow(new IllegalArgumentException("Keep between 1 and 1,000 recordings per listener."))
         .when(storageService)
-        .saveLimit(any());
+        .saveRecordsPerListener(20);
 
     mockMvc
-        .perform(post("/settings/storage").param("limitGb", "20"))
+        .perform(post("/settings/storage/record-retention").param("recordsPerListener", "20"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/settings/storage"))
-        .andExpect(flash().attributeExists("storageLimitForm"))
+        .andExpect(flash().attributeExists("recordRetentionForm"))
         .andExpect(
             flash()
-                .attributeExists("org.springframework.validation.BindingResult.storageLimitForm"));
+                .attributeExists(
+                    "org.springframework.validation.BindingResult.recordRetentionForm"));
   }
 
   @Test
   void saveReportsAStorageFailure() throws Exception {
     doThrow(new DataAccessResourceFailureException("offline"))
         .when(storageService)
-        .saveLimit(any());
+        .saveRecordsPerListener(20);
 
     mockMvc
-        .perform(post("/settings/storage").param("limitGb", "20"))
+        .perform(post("/settings/storage/record-retention").param("recordsPerListener", "20"))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/settings/storage"))
         .andExpect(
-            flash().attribute("errorMessage", "The storage limit could not be saved. Try again."));
+            flash()
+                .attribute("errorMessage", "Recording retention could not be saved. Try again."));
   }
 
   private static StorageSnapshot snapshot() {
@@ -118,7 +123,6 @@ class StorageSettingsControllerTest {
         35_000_000_000L,
         65_000_000_000L,
         12_000_000_000L,
-        20_000_000_000L,
         true);
   }
 }

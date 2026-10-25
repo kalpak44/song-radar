@@ -21,6 +21,10 @@
                 Select one channel from <span class="text-slate-200" th:text="${playlist.name}">Music TV</span>
                 and set the cadence for its short audio captures.
             </p>
+            <a th:if="${editing}" th:href="@{/recordings(listenerId=${listenerId})}"
+               class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-emerald-300 transition hover:text-emerald-200">
+                View this listener’s recordings <span aria-hidden="true">→</span>
+            </a>
         </div>
 
         <form method="post" th:object="${listenerForm}"
@@ -158,67 +162,6 @@
             </aside>
         </form>
 
-        <section th:if="${editing}" class="mt-10 border-t border-slate-800/80 pt-8" aria-labelledby="recordings-title">
-            <div class="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                    <p class="text-[0.68rem] font-medium uppercase tracking-[0.18em] text-emerald-400/80">Capture history</p>
-                    <h2 id="recordings-title" class="mt-1 text-xl font-semibold tracking-tight">Recordings</h2>
-                    <p class="mt-1 text-sm text-slate-500">Listen to audio captured by this listener.</p>
-                </div>
-                <span class="rounded-full border border-slate-800 bg-slate-900/60 px-3 py-1 font-mono text-xs text-slate-400"
-                      th:text="|${#lists.size(recordings)} total|">0 total</span>
-            </div>
-
-            <div th:if="${#lists.isEmpty(recordings)}"
-                 class="mt-4 rounded-2xl border border-dashed border-slate-800/80 bg-slate-900/20 px-5 py-8 text-center">
-                <p class="text-sm font-medium text-slate-300">No recordings yet</p>
-                <p class="mt-1 text-sm text-slate-500">Completed captures will appear here with an audio player.</p>
-            </div>
-
-            <div th:unless="${#lists.isEmpty(recordings)}" class="mt-4 space-y-3">
-                <article th:each="recording : ${recordings}"
-                         class="rounded-xl border border-slate-800/80 bg-slate-900/25 p-4 sm:p-5">
-                    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                        <div class="flex min-w-0 items-center gap-3">
-                            <span class="grid size-9 shrink-0 place-items-center rounded-lg border border-slate-800 bg-slate-950/70 text-emerald-300">
-                                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                     stroke-width="1.7" aria-hidden="true">
-                                    <path d="M4 10v4m4-7v10m4-14v18m4-14v10m4-7v4"/>
-                                </svg>
-                            </span>
-                            <div class="min-w-0">
-                                <h3 class="truncate text-sm font-medium text-slate-100">
-                                    <time data-local-time="detailed" th:attr="datetime=${recording.recordedAtInstant}"
-                                          th:text="${recording.recordedAt}">Oct 24, 2026 · 22:40:00</time>
-                                </h3>
-                                <p class="mt-0.5 text-xs text-slate-500">
-                                    <span th:text="${recording.duration}">12 seconds</span>
-                                    <span aria-hidden="true"> · </span>
-                                    <span th:text="${recording.size}">384 KB</span>
-                                </p>
-                            </div>
-                        </div>
-                        <span th:if="${recording.playable}"
-                              class="rounded-full border border-emerald-800/60 bg-emerald-950/40 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-wider text-emerald-300">
-                            Ready
-                        </span>
-                        <span th:unless="${recording.playable}"
-                              class="rounded-full border border-amber-800/60 bg-amber-950/30 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-wider text-amber-200">
-                            Failed
-                        </span>
-                    </div>
-
-                    <audio th:if="${recording.playable}" controls preload="none"
-                           class="recording-player mt-4 w-full"
-                           th:src="@{/playlists/{playlistId}/listeners/{listenerId}/recordings/{recordingId}/audio(playlistId=${playlist.id},listenerId=${listenerId},recordingId=${recording.id})}"
-                           aria-label="Listen to this recording">
-                        Your browser does not support audio playback.
-                    </audio>
-                    <p th:unless="${recording.playable}" class="mt-3 text-sm text-amber-200/80"
-                       th:text="${recording.errorMessage}">The stream was unavailable.</p>
-                </article>
-            </div>
-        </section>
     </div>
 
     <script>
