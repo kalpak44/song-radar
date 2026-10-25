@@ -26,6 +26,10 @@ final class Mp3Encoding {
       throws IOException {
     Decoder decoder = new Decoder(audioSpecificConfig);
     SampleBuffer samples = new SampleBuffer();
+    // The decoder writes big-endian samples unless told otherwise, and the encoder below is
+    // given a little-endian format. Mismatched, every sample is byte-swapped and the track
+    // encodes as white noise at the right length, which no size or duration check can catch.
+    samples.setBigEndian(false);
     LameEncoder encoder = null;
     byte[] pending = null;
     byte[] encoded = null;

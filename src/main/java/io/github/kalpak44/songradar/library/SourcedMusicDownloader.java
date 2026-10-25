@@ -24,6 +24,16 @@ public class SourcedMusicDownloader implements MusicDownloader {
 
   private static final Logger log = LoggerFactory.getLogger(SourcedMusicDownloader.class);
 
+  /** Kept in step with the prefix the file manager filters out of its listings. */
+  private static final String HIDDEN_PREFIX = ".songradar-download-";
+
+  /**
+   * A source that answers with an error page, or a stream that stops after a few segments, still
+   * produces a file. Nothing shorter than this is a track, so it counts as a failed download and
+   * the next source gets its turn.
+   */
+  private static final int SHORTEST_TRACK_SECONDS = 30;
+
   private final List<TrackSource> sources;
 
   public SourcedMusicDownloader(List<TrackSource> sources) {
@@ -63,20 +73,19 @@ public class SourcedMusicDownloader implements MusicDownloader {
 
   /**
    * Written beside the target and moved over it, so a failed or half-written download never
-   * replaces a file that was already playable.
+   * replaces a file that was already playable. The name carries the prefix the file manager hides:
+   * a download in progress would otherwise be listed as a playable track that stops existing the
+   * moment it finishes.
    */
   private void store(SourceTrack track, Path target, String artist, String title)
       throws IOException {
     Files.createDirectories(target.getParent());
-    Path partial = Files.createTempFile(target.getParent(), ".download-", ".mp3");
+    Path partial = Files.createTempFile(target.getParent(), HIDDEN_PREFIX, ".mp3");
     try {
       try (OutputStream out = Files.newOutputStream(partial)) {
         track.content().writeTo(out);
       }
-      if (Files.size(partial) == 0) {
-        throw new IOException("the source produced an empty file");
-      }
-      tag(partial, track.source(), artist, title);
+      tag(playable(partial), partial, track.source(), artist, title);
       Files.move(
           partial, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     } finally {
@@ -85,13 +94,30 @@ public class SourcedMusicDownloader implements MusicDownloader {
   }
 
   /**
+   * Parses what arrived rather than trusting the transfer, so only real audio is ever filed. The
+   * length check is the half that catches a stream which started correctly and then stopped.
+   */
+  private static Mp3File playable(Path file) throws IOException {
+    Mp3File mp3;
+    try {
+      mp3 = new Mp3File(file);
+    } catch (Exception exception) {
+      throw new IOException("the source did not return playable audio", exception);
+    }
+    if (mp3.getLengthInSeconds() < SHORTEST_TRACK_SECONDS) {
+      throw new IOException(
+          "the source returned only " + mp3.getLengthInSeconds() + " seconds of audio");
+    }
+    return mp3;
+  }
+
+  /**
    * Tagged with the detected artist and title rather than the upload's own, which carries the
    * uploader's account name and decorations like "[Original Version]" into every player. Untagged
    * audio still plays, so a tagging failure is reported rather than raised.
    */
-  private void tag(Path file, String source, String artist, String title) {
+  private void tag(Mp3File mp3, Path file, String source, String artist, String title) {
     try {
-      Mp3File mp3 = new Mp3File(file);
       ID3v24Tag tags = new ID3v24Tag();
       tags.setArtist(artist);
       tags.setTitle(title);

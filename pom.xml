@@ -31,6 +31,10 @@
         <sonar.plugin.version>5.8.0.7211</sonar.plugin.version>
         <jib.plugin.version>3.5.2</jib.plugin.version>
 
+        <!-- The source checks reach the real music catalogues, so they are held out of the
+             normal build and run on their own schedule. -->
+        <excluded.test.groups>live</excluded.test.groups>
+
         <sonar.projectKey>song-radar</sonar.projectKey>
         <sonar.organization>kalpak44</sonar.organization>
         <sonar.coverage.jacoco.xmlReportPaths>${project.basedir}/target/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
@@ -81,6 +85,16 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Declared before jcodec on purpose. jcodec bundles a stripped copy of these same
+             net.sourceforge.jaad classes with no SBR, which decodes HE-AAC without its high
+             band — audibly dull, and no length or format check can see it. This build has the
+             same API, so jcodec's own decoder keeps working against it. -->
+        <dependency>
+            <groupId>com.gitlab.9lukas5</groupId>
+            <artifactId>jaad</artifactId>
+            <version>0.8.8</version>
+        </dependency>
+
         <!-- Decode MPEG-TS/AAC HLS segments in-process; recordings are persisted as WAV. -->
         <dependency>
             <groupId>org.jcodec</groupId>
@@ -121,6 +135,16 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- A catalogue being unreachable must never fail a pull request; the scheduled
+                 source check clears this group with -Dexcluded.test.groups=. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${excluded.test.groups}</excludedGroups>
+                </configuration>
             </plugin>
 
             <!-- The pom declares Java 25 but the compiler only needs a 25 bytecode

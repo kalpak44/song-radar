@@ -127,15 +127,16 @@ final class Mp4Aac {
     buffer.position(trun.payload());
     int flags = buffer.getInt() & 0xffffff;
     int count = buffer.getInt();
-    if ((flags & 0x000001) != 0) {
-      buffer.getInt();
-    }
+    // Where the samples start, counted from the movie fragment box rather than from the media
+    // data box. Assuming they begin right after the mdat header shifts every sample in the
+    // fragment by a few bytes, which still decodes — into silence and noise.
+    Integer dataOffset = (flags & 0x000001) != 0 ? buffer.getInt() : null;
     if ((flags & 0x000004) != 0) {
       buffer.getInt();
     }
 
     List<byte[]> frames = new ArrayList<>(count);
-    int offset = mdat.payload();
+    int offset = dataOffset == null ? mdat.payload() : moof.start() + dataOffset;
     for (int i = 0; i < count; i++) {
       if ((flags & 0x000100) != 0) {
         buffer.getInt();

@@ -107,16 +107,16 @@ public class SoundCloudTrackSource implements TrackSource {
   }
 
   /**
-   * MPEG needs no transcode so it is tried first, but an upload can advertise a variant it will not
-   * serve, which arrives as a 404 on the stream rather than as a missing transcoding.
+   * Ordered by how much has to be done to the bytes: MPEG is copied through, plain AAC decodes
+   * faithfully, and the 96k variant is HE-AAC whose high band this decoder does not reconstruct. An
+   * upload can also advertise a variant it will not serve, which arrives as a 404 on the stream
+   * rather than as a missing transcoding, so each is tried in turn.
    */
   private void write(Track track, String id, OutputStream out) throws IOException {
     List<Transcoding> candidates =
         track.media().transcodings().stream()
             .filter(t -> t.format() != null && "hls".equals(t.format().protocol()))
-            .sorted(
-                java.util.Comparator.comparingInt(
-                    t -> "audio/mpegurl".equals(t.format().mime_type()) ? 0 : 1))
+            .sorted(java.util.Comparator.comparingInt(SoundCloudTrackSource::fidelity))
             .toList();
     for (Transcoding transcoding : candidates) {
       try {
@@ -130,6 +130,14 @@ public class SoundCloudTrackSource implements TrackSource {
       }
     }
     throw new IOException("no advertised stream could be fetched");
+  }
+
+  /** Lower is better: no transcode, then AAC-LC, then HE-AAC. */
+  private static int fidelity(Transcoding transcoding) {
+    if ("audio/mpegurl".equals(transcoding.format().mime_type())) {
+      return 0;
+    }
+    return "aac_160k".equals(transcoding.preset()) ? 1 : 2;
   }
 
   private void writeTranscoding(
@@ -249,7 +257,7 @@ public class SoundCloudTrackSource implements TrackSource {
 
   record Media(List<Transcoding> transcodings) {}
 
-  record Transcoding(String url, Format format) {}
+  record Transcoding(String url, String preset, Format format) {}
 
   record Format(String protocol, String mime_type) {}
 
