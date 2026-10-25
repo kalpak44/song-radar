@@ -41,6 +41,13 @@ public class SoundCloudTrackSource implements TrackSource {
    */
   private static final List<String> LOSSLESSLY_DECODED = List.of("aac_160k", "aac_256k");
 
+  /**
+   * The adaptive MPEG playlist is advertised on almost every upload and served on none of them —
+   * measured 404 on every track tried. Asking for it costs a request and a misleading log line on
+   * each download, so it is not offered as a candidate at all.
+   */
+  private static final String ADVERTISED_BUT_NOT_SERVED = "abr_sq";
+
   private final String api;
   private final String site;
   private final Pattern asset;
@@ -132,18 +139,25 @@ public class SoundCloudTrackSource implements TrackSource {
   }
 
   private void write(Track track, String id, OutputStream out) throws IOException {
+    List<String> refused = new ArrayList<>();
     for (Transcoding transcoding : usable(track)) {
       try {
         writeTranscoding(transcoding, track.track_authorization(), id, out);
         return;
       } catch (IOException | RuntimeException exception) {
-        log.info(
+        // Debug: a variant that fails is recovered from by trying the next one, and only the
+        // case where none of them worked is worth a line in the log.
+        log.debug(
             "SoundCloud would not serve the {} stream: {}",
             transcoding.format().mime_type(),
             exception.toString());
+        refused.add(transcoding.preset() + " (" + exception.getMessage() + ")");
       }
     }
-    throw new IOException("no advertised stream could be fetched");
+    throw new IOException(
+        refused.isEmpty()
+            ? "the upload offers no stream this can read"
+            : "no advertised stream could be fetched: " + String.join("; ", refused));
   }
 
   /**
@@ -158,6 +172,10 @@ public class SoundCloudTrackSource implements TrackSource {
   private static List<Transcoding> usable(Track track) {
     return track.media().transcodings().stream()
         .filter(t -> t.format() != null && "hls".equals(t.format().protocol()))
+        // Each variant says for itself whether it is a preview, which is finer than the track's
+        // own policy: an upload can offer a full stream and a snipped one side by side.
+        .filter(t -> !Boolean.TRUE.equals(t.snipped()))
+        .filter(t -> !ADVERTISED_BUT_NOT_SERVED.equals(t.preset()))
         .filter(t -> isMpeg(t) || LOSSLESSLY_DECODED.contains(t.preset()))
         .sorted(java.util.Comparator.comparingInt(t -> isMpeg(t) ? 0 : 1))
         .toList();
@@ -292,7 +310,7 @@ public class SoundCloudTrackSource implements TrackSource {
 
   record Media(List<Transcoding> transcodings) {}
 
-  record Transcoding(String url, String preset, Format format) {}
+  record Transcoding(String url, String preset, Boolean snipped, Format format) {}
 
   record Format(String protocol, String mime_type) {}
 

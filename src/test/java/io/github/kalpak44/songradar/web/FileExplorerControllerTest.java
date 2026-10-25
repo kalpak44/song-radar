@@ -1,6 +1,7 @@
 package io.github.kalpak44.songradar.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -252,7 +253,7 @@ class FileExplorerControllerTest {
     mockMvc
         .perform(get("/files/download").param("path", "song.mp3"))
         .andExpect(status().isOk())
-        .andExpect(header().string("Content-Disposition", "attachment; filename=\"song.mp3\""))
+        .andExpect(header().string("Content-Disposition", containsString("filename=\"song.mp3\"")))
         .andExpect(header().longValue("Content-Length", 5));
   }
 
@@ -280,7 +281,22 @@ class FileExplorerControllerTest {
         .perform(get("/files/audio").param("path", "song.mp3"))
         .andExpect(status().isOk())
         .andExpect(header().string("Content-Type", "audio/mpeg"))
-        .andExpect(header().string("Content-Disposition", "inline; filename=\"song.mp3\""));
+        .andExpect(header().string("Content-Disposition", containsString("filename=\"song.mp3\"")));
+  }
+
+  /** Tomcat drops a header it cannot encode, so the track would play with no name at all. */
+  @Test
+  void servesAudioWhoseNameIsNotAscii() throws Exception {
+    Path song = Files.writeString(root.resolve("Reflex - Я разбила небо.mp3"), "music");
+    when(files.file("Reflex - Я разбила небо.mp3")).thenReturn(song);
+
+    mockMvc
+        .perform(get("/files/audio").param("path", "Reflex - Я разбила небо.mp3"))
+        .andExpect(status().isOk())
+        .andExpect(
+            header()
+                .string(
+                    "Content-Disposition", containsString("filename*=UTF-8''Reflex%20-%20%D0%AF")));
   }
 
   @Test
@@ -292,6 +308,7 @@ class FileExplorerControllerTest {
         .perform(get("/files/audio").param("path", "notes.zzz"))
         .andExpect(status().isOk())
         .andExpect(header().string("Content-Type", "application/octet-stream"))
-        .andExpect(header().string("Content-Disposition", "inline; filename=\"notes.zzz\""));
+        .andExpect(
+            header().string("Content-Disposition", containsString("filename=\"notes.zzz\"")));
   }
 }

@@ -151,10 +151,7 @@ public class FileExplorerController {
         .contentType(MediaType.APPLICATION_OCTET_STREAM)
         .header(
             HttpHeaders.CONTENT_DISPOSITION,
-            ContentDisposition.attachment()
-                .filename(file.getFileName().toString())
-                .build()
-                .toString())
+            disposition(ContentDisposition.attachment(), file.getFileName().toString()))
         .contentLength(Files.size(file))
         .body(new FileSystemResource(file));
   }
@@ -181,6 +178,15 @@ public class FileExplorerController {
         .body(body);
   }
 
+  /**
+   * The filename is encoded per RFC 6266 rather than written into the header raw. A library track
+   * is named after its artist and title, so it routinely contains characters the header's own
+   * charset cannot hold — and the server then drops the whole header rather than the name.
+   */
+  private static String disposition(ContentDisposition.Builder builder, String filename) {
+    return builder.filename(filename, java.nio.charset.StandardCharsets.UTF_8).build().toString();
+  }
+
   @GetMapping("/files/audio")
   public ResponseEntity<Resource> audio(@RequestParam String path) throws IOException {
     Path file = files.file(path);
@@ -191,7 +197,7 @@ public class FileExplorerController {
         .contentType(type)
         .header(
             HttpHeaders.CONTENT_DISPOSITION,
-            ContentDisposition.inline().filename(file.getFileName().toString()).build().toString())
+            disposition(ContentDisposition.inline(), file.getFileName().toString()))
         .contentLength(Files.size(file))
         .body(new FileSystemResource(file));
   }
