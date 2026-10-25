@@ -48,22 +48,22 @@
                         </span>
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
-                                <h3 class="truncate text-sm font-semibold text-slate-100" th:text="${row.detection.title != null ? row.detection.title : 'Track not identified'}">Track title</h3>
-                                <span th:if="${row.detection.status.name() == 'MATCHED'}" class="rounded-full border border-emerald-800/60 bg-emerald-950/35 px-2 py-0.5 text-[0.65rem] font-medium text-emerald-300">IDENTIFIED</span>
-                                <span th:if="${row.detection.status.name() == 'PENDING'}" class="rounded-full border border-sky-800/60 bg-sky-950/35 px-2 py-0.5 text-[0.65rem] font-medium text-sky-300">PENDING</span>
-                                <span th:if="${row.detection.status.name() == 'NO_MATCH'}" class="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[0.65rem] font-medium text-slate-400">NO MATCH</span>
-                                <span th:if="${row.detection.status.name() == 'FAILED' or row.detection.status.name() == 'UNAVAILABLE'}" class="rounded-full border border-amber-900/60 bg-amber-950/30 px-2 py-0.5 text-[0.65rem] font-medium text-amber-200">UNAVAILABLE</span>
+                                <h3 class="truncate text-sm font-semibold text-slate-100" th:text="${row.title != null ? row.title : 'Track not identified'}">Track title</h3>
+                                <span th:if="${row.status.name() == 'MATCHED'}" class="rounded-full border border-emerald-800/60 bg-emerald-950/35 px-2 py-0.5 text-[0.65rem] font-medium text-emerald-300">IDENTIFIED</span>
+                                <span th:if="${row.status.name() == 'PENDING'}" class="rounded-full border border-sky-800/60 bg-sky-950/35 px-2 py-0.5 text-[0.65rem] font-medium text-sky-300">PENDING</span>
+                                <span th:if="${row.status.name() == 'NO_MATCH'}" class="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[0.65rem] font-medium text-slate-400">NO MATCH</span>
+                                <span th:if="${row.status.name() == 'FAILED' or row.status.name() == 'UNAVAILABLE'}" class="rounded-full border border-amber-900/60 bg-amber-950/30 px-2 py-0.5 text-[0.65rem] font-medium text-amber-200">UNAVAILABLE</span>
                             </div>
-                            <p class="mt-1 text-sm text-slate-400" th:if="${row.detection.artist != null}" th:text="${row.detection.artist}">Artist</p>
-                            <p class="mt-1 text-xs leading-5 text-slate-500" th:if="${row.detection.album != null}" th:text="${row.detection.album}">Album</p>
-                            <p th:if="${row.detection.errorMessage != null}" class="mt-2 max-w-2xl text-xs text-amber-200/75" th:text="${row.detection.errorMessage}">Provider error</p>
+                            <p class="mt-1 text-sm text-slate-400" th:if="${row.artist != null}" th:text="${row.artist}">Artist</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500" th:if="${row.album != null}" th:text="${row.album}">Album</p>
+                            <p th:if="${row.errorMessage != null}" class="mt-2 max-w-2xl text-xs text-amber-200/75" th:text="${row.errorMessage}">Provider error</p>
                         </div>
                     </div>
                     <div class="ml-12 flex min-w-40 flex-col items-start gap-2 text-xs text-slate-500 sm:ml-0 sm:items-end">
-                        <span><span th:text="${row.detection.detectionCount}">1</span> <span th:text="${row.detection.detectionCount == 1 ? 'detection' : 'detections'}">detections</span></span>
+                        <span><span th:text="${row.detectionCount}">1</span> <span th:text="${row.detectionCount == 1 ? 'detection' : 'detections'}">detections</span></span>
                         <span class="text-slate-600">Last detected</span>
-                        <time data-local-time="compact" th:attr="datetime=${row.detection.detectedAt}" th:text="${row.detection.detectedAt}">Recently</time>
-                        <a th:if="${row.detection.trackUrl != null}" th:href="${row.detection.trackUrl}" target="_blank" rel="noreferrer" class="font-medium text-emerald-300 transition hover:text-emerald-200">Open track ↗</a>
+                        <time data-local-time="compact" th:attr="datetime=${row.detectedAt}" th:text="${row.detectedAt}">Recently</time>
+                        <a th:if="${row.trackUrl != null}" th:href="${row.trackUrl}" target="_blank" rel="noreferrer" class="font-medium text-emerald-300 transition hover:text-emerald-200">Open track ↗</a>
                     </div>
                 </article>
             </div>

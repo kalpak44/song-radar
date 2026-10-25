@@ -1,12 +1,13 @@
 package io.github.kalpak44.songradar.web;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -19,13 +20,7 @@ import io.github.kalpak44.songradar.detection.SoundDetectionService;
 import io.github.kalpak44.songradar.detection.SoundDetectionService.ManualAttemptResult;
 import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
-import io.github.kalpak44.songradar.listener.ListenerStatus;
-import io.github.kalpak44.songradar.listener.PlaylistListener;
-import io.github.kalpak44.songradar.listener.PlaylistListenerRepository;
 import io.github.kalpak44.songradar.listener.RecordingStatus;
-import io.github.kalpak44.songradar.playlist.PlaylistSource;
-import io.github.kalpak44.songradar.playlist.PlaylistSourceRepository;
-import io.github.kalpak44.songradar.playlist.SourceType;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -39,7 +34,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
 
 @WebMvcTest(SoundDetectionController.class)
 @Import(SoundDetectionControllerTest.ClockTestConfiguration.class)
@@ -50,8 +44,6 @@ class SoundDetectionControllerTest {
   @Autowired private MockMvc mockMvc;
   @MockitoBean private SoundDetectionService service;
   @MockitoBean private ListenerRecordingRepository recordings;
-  @MockitoBean private PlaylistListenerRepository listeners;
-  @MockitoBean private PlaylistSourceRepository playlists;
 
   @Test
   void emptyDetectionsPageClampsThePageAndExposesModelState() throws Exception {
@@ -59,8 +51,6 @@ class SoundDetectionControllerTest {
     when(service.page(1, 30)).thenReturn(List.of());
     when(service.isConfigured()).thenReturn(false);
     when(service.pendingCount()).thenReturn(0L);
-    when(listeners.findAll()).thenReturn(List.of());
-    when(playlists.findAll()).thenReturn(List.of());
 
     mockMvc
         .perform(get("/detections").param("page", "9"))
@@ -71,49 +61,28 @@ class SoundDetectionControllerTest {
         .andExpect(model().attribute("pendingCount", 0L))
         .andExpect(model().attribute("total", 0L))
         .andExpect(model().attribute("currentPage", 1))
-        .andExpect(model().attribute("totalPages", 1))
-        .andExpect(model().attribute("localZone", "Z"));
+        .andExpect(model().attribute("totalPages", 1));
 
     verify(service).page(1, 30);
   }
 
   @Test
-  void detectionsPageMapsListenerPlaylistAndRecordingDetails() throws Exception {
+  void detectionsPageRendersDetectionWithoutLoadingItsSourceRecording() throws Exception {
     when(service.count()).thenReturn(31L);
-    when(service.page(2, 30))
-        .thenReturn(List.of(detection(1L, 14L), detection(2L, null), detection(3L, 99L)));
+    when(service.page(2, 30)).thenReturn(List.of(detection(1L, null)));
     when(service.isConfigured()).thenReturn(true);
     when(service.pendingCount()).thenReturn(2L);
-    when(listeners.findAll()).thenReturn(List.of(listener()));
-    when(playlists.findAll()).thenReturn(List.of(playlist()));
-    when(recordings.findById(14L)).thenReturn(Optional.of(recording()));
-    when(recordings.findById(99L)).thenReturn(Optional.empty());
 
-    MvcResult result =
-        mockMvc
-            .perform(get("/detections").param("page", "2"))
-            .andExpect(status().isOk())
-            .andExpect(view().name("detections"))
-            .andExpect(model().attribute("currentPage", 2))
-            .andExpect(model().attribute("totalPages", 2))
-            .andReturn();
-
-    @SuppressWarnings("unchecked")
-    List<SoundDetectionController.DetectionRow> rows =
-        (List<SoundDetectionController.DetectionRow>)
-            result.getModelAndView().getModel().get("rows");
-
-    assertThat(rows).hasSize(3);
-    assertThat(rows.get(0).listenerName()).isEqualTo("MTV Listener");
-    assertThat(rows.get(0).playlistName()).isEqualTo("Music TV");
-    assertThat(rows.get(0).recordingId()).isEqualTo(14L);
-    assertThat(rows.get(0).recordedAt()).isEqualTo(NOW.minusSeconds(48));
-    assertThat(rows.get(1).listenerName()).isEqualTo("Removed listener");
-    assertThat(rows.get(1).channelName()).isEmpty();
-    assertThat(rows.get(1).recordingId()).isNull();
-    assertThat(rows.get(2).listenerName()).isEqualTo("Removed listener");
-    assertThat(rows.get(2).playlistName()).isEqualTo("Removed playlist");
-    assertThat(rows.get(2).recordedAt()).isNull();
+    mockMvc
+        .perform(get("/detections").param("page", "2"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("detections"))
+        .andExpect(model().attribute("currentPage", 2))
+        .andExpect(model().attribute("totalPages", 2))
+        .andExpect(content().string(containsString("Song")))
+        .andExpect(content().string(containsString("Artist")))
+        .andExpect(content().string(containsString("Open track")));
+    verify(recordings, never()).findById(any());
   }
 
   @Test
@@ -232,26 +201,6 @@ class SoundDetectionControllerTest {
         1200,
         12_000,
         null);
-  }
-
-  private static PlaylistListener listener() {
-    return new PlaylistListener(
-        7L,
-        4L,
-        "MTV Listener",
-        "MTV Hits",
-        "https://e.com/mtv",
-        180,
-        12,
-        ListenerStatus.ACTIVE,
-        NOW,
-        NOW,
-        null,
-        NOW.plusSeconds(180));
-  }
-
-  private static PlaylistSource playlist() {
-    return new PlaylistSource(4L, "Music TV", SourceType.URL, "https://e.com/list", null, NOW);
   }
 
   @TestConfiguration
