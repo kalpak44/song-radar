@@ -17,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.github.kalpak44.songradar.detection.DetectionStatus;
 import io.github.kalpak44.songradar.detection.SoundDetection;
 import io.github.kalpak44.songradar.detection.SoundDetectionService;
+import io.github.kalpak44.songradar.detection.SoundDetectionService.DownloadPlanResult;
 import io.github.kalpak44.songradar.detection.SoundDetectionService.ManualAttemptResult;
 import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
@@ -81,8 +82,39 @@ class SoundDetectionControllerTest {
         .andExpect(model().attribute("totalPages", 2))
         .andExpect(content().string(containsString("Song")))
         .andExpect(content().string(containsString("Artist")))
-        .andExpect(content().string(containsString("Open track")));
+        .andExpect(content().string(containsString("Open track")))
+        .andExpect(content().string(containsString("Find &amp; download")));
     verify(recordings, never()).findById(any());
+  }
+
+  @Test
+  void findAndDownloadReportsDummyPlan() throws Exception {
+    when(service.planDownload(23L)).thenReturn(DownloadPlanResult.PLANNED);
+
+    mockMvc
+        .perform(post("/detections/23/download"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/detections"))
+        .andExpect(
+            flash()
+                .attribute(
+                    "successMessage",
+                    "Download plan logged. The current dummy downloader does not create a file yet."));
+  }
+
+  @Test
+  void findAndDownloadExplainsExpiredSourceRecording() throws Exception {
+    when(service.planDownload(23L)).thenReturn(DownloadPlanResult.RECORDING_EXPIRED);
+
+    mockMvc
+        .perform(post("/detections/23/download"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/detections"))
+        .andExpect(
+            flash()
+                .attribute(
+                    "errorMessage",
+                    "The source recording has expired, so its listener library folder is unavailable."));
   }
 
   @Test

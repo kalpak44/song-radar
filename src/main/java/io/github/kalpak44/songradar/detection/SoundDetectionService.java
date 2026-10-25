@@ -1,7 +1,10 @@
 package io.github.kalpak44.songradar.detection;
 
+import io.github.kalpak44.songradar.library.MusicDownloader;
 import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
+import io.github.kalpak44.songradar.listener.PlaylistListener;
+import io.github.kalpak44.songradar.listener.PlaylistListenerRepository;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.Normalizer;
@@ -26,22 +29,31 @@ public class SoundDetectionService {
   private static final String PROVIDER = "AudD";
 
   private final Path root;
+  private final Path libraryRoot;
   private final SoundDetectionRepository detections;
   private final ListenerRecordingRepository recordings;
+  private final PlaylistListenerRepository listeners;
+  private final MusicDownloader downloader;
   private final AuddRecognitionClient recognition;
   private final TaskExecutor executor;
   private final Clock clock;
 
   public SoundDetectionService(
       @Value("${songradar.storage.recordings}") Path root,
+      @Value("${songradar.storage.library}") Path libraryRoot,
       SoundDetectionRepository detections,
       ListenerRecordingRepository recordings,
+      PlaylistListenerRepository listeners,
+      MusicDownloader downloader,
       AuddRecognitionClient recognition,
       @Qualifier("recognitionTaskExecutor") TaskExecutor executor,
       Clock clock) {
     this.root = root.toAbsolutePath().normalize();
+    this.libraryRoot = libraryRoot.toAbsolutePath().normalize();
     this.detections = detections;
     this.recordings = recordings;
+    this.listeners = listeners;
+    this.downloader = downloader;
     this.recognition = recognition;
     this.executor = executor;
     this.clock = clock;
@@ -211,7 +223,7 @@ public class SoundDetectionService {
       detections.deleteById(pending.id());
       return;
     }
-    detections.save(
+    SoundDetection candidate =
         new SoundDetection(
             pending.id(),
             pending.recordingId(),
@@ -226,7 +238,36 @@ public class SoundDetectionService {
             pending.firstDetectedAt(),
             now,
             pending.detectionCount(),
-            null));
+            null);
+    SoundDetection matched = detections.save(candidate);
+    queueDownloadPlan(matched == null ? candidate : matched);
+  }
+
+  private void queueDownloadPlan(SoundDetection detection) {
+    if (detection.recordingId() == null) {
+      return;
+    }
+    recordings
+        .findById(detection.recordingId())
+        .map(ListenerRecording::listenerId)
+        .filter(java.util.Objects::nonNull)
+        .flatMap(listeners::findById)
+        .ifPresentOrElse(
+            listener ->
+                downloader.download(detection, libraryRoot.resolve(safeFolderName(listener))),
+            () ->
+                log.info(
+                    "Dummy downloader skipped detection {} because its listener is no longer available",
+                    detection.id()));
+  }
+
+  private static String safeFolderName(PlaylistListener listener) {
+    String name = listener.name() == null ? "" : listener.name();
+    String safe = name.replaceAll("[\\p{Cntrl}/\\\\:*?\"<>|]", " ").replaceAll("\\s+", " ").trim();
+    if (safe.isBlank() || safe.equals(".") || safe.equals("..")) {
+      return "listener-" + listener.id();
+    }
+    return safe.length() > 120 ? safe.substring(0, 120).trim() : safe;
   }
 
   private void update(
@@ -272,6 +313,36 @@ public class SoundDetectionService {
 
   public boolean isConfigured() {
     return recognition.isConfigured();
+  }
+
+  public DownloadPlanResult planDownload(long detectionId) {
+    SoundDetection detection = detections.findById(detectionId).orElse(null);
+    if (detection == null) {
+      return DownloadPlanResult.NOT_FOUND;
+    }
+    if (detection.status() != DetectionStatus.MATCHED) {
+      return DownloadPlanResult.NOT_IDENTIFIED;
+    }
+    if (detection.recordingId() == null) {
+      return DownloadPlanResult.RECORDING_EXPIRED;
+    }
+    ListenerRecording recording = recordings.findById(detection.recordingId()).orElse(null);
+    if (recording == null || recording.listenerId() == null) {
+      return DownloadPlanResult.RECORDING_EXPIRED;
+    }
+    PlaylistListener listener = listeners.findById(recording.listenerId()).orElse(null);
+    if (listener == null) {
+      return DownloadPlanResult.RECORDING_EXPIRED;
+    }
+    downloader.download(detection, libraryRoot.resolve(safeFolderName(listener)));
+    return DownloadPlanResult.PLANNED;
+  }
+
+  public enum DownloadPlanResult {
+    PLANNED,
+    NOT_FOUND,
+    NOT_IDENTIFIED,
+    RECORDING_EXPIRED
   }
 
   private static String trackKey(String title, String artist) {

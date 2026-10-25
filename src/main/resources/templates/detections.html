@@ -22,6 +22,8 @@
         <div th:unless="${configured}" role="status" class="mt-5 rounded-xl border border-amber-900/60 bg-amber-950/25 px-4 py-3 text-sm leading-6 text-amber-100/90">
             Recognition is not configured yet. Set <code class="rounded bg-black/30 px-1.5 py-0.5 font-mono text-amber-200">SONGRADAR_AUDD_API_TOKEN</code> to identify new recordings. AudD offers a limited free trial; requests beyond it may require a paid plan.
         </div>
+        <div th:if="${successMessage}" role="status" class="mt-5 rounded-xl border border-emerald-900/60 bg-emerald-950/25 px-4 py-3 text-sm text-emerald-100/90" th:text="${successMessage}">Download plan logged.</div>
+        <div th:if="${errorMessage}" role="alert" class="mt-5 rounded-xl border border-rose-900/60 bg-rose-950/25 px-4 py-3 text-sm text-rose-100/90" th:text="${errorMessage}">Could not plan download.</div>
         <div th:if="${configured and pendingCount > 0}" role="status" class="mt-5 rounded-xl border border-sky-900/60 bg-sky-950/25 px-4 py-3 text-sm text-sky-100/90">
             <span th:text="|${pendingCount} recording${pendingCount == 1 ? '' : 's'} waiting for recognition.|">Waiting for recognition.</span>
         </div>
@@ -57,6 +59,12 @@
                             <p class="mt-1 text-sm text-slate-400" th:if="${row.artist != null}" th:text="${row.artist}">Artist</p>
                             <p class="mt-1 text-xs leading-5 text-slate-500" th:if="${row.album != null}" th:text="${row.album}">Album</p>
                             <p th:if="${row.errorMessage != null}" class="mt-2 max-w-2xl text-xs text-amber-200/75" th:text="${row.errorMessage}">Provider error</p>
+                            <form th:if="${row.status.name() == 'MATCHED'}" th:action="@{/detections/{id}/download(id=${row.id})}" method="post" class="mt-3">
+                                <button type="submit" class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-emerald-800/70 bg-emerald-950/35 px-3 py-2 text-xs font-medium text-emerald-200 transition hover:border-emerald-600 hover:bg-emerald-900/40 focus:outline-none focus:ring-2 focus:ring-emerald-400/70">
+                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 17v3h14v-3"/></svg>
+                                    Find &amp; download
+                                </button>
+                            </form>
                         </div>
                     </div>
                     <div class="ml-12 flex min-w-40 flex-col items-start gap-2 text-xs text-slate-500 sm:ml-0 sm:items-end">

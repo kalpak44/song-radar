@@ -9,8 +9,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.github.kalpak44.songradar.library.MusicDownloader;
 import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
+import io.github.kalpak44.songradar.listener.PlaylistListenerRepository;
 import io.github.kalpak44.songradar.listener.RecordingStatus;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,6 +36,8 @@ class SoundDetectionServiceTest {
 
   private SoundDetectionRepository detections;
   private ListenerRecordingRepository recordings;
+  private PlaylistListenerRepository listeners;
+  private MusicDownloader downloader;
   private AuddRecognitionClient recognition;
   private TaskExecutor executor;
   private SoundDetectionService service;
@@ -42,11 +46,21 @@ class SoundDetectionServiceTest {
   void setUp() {
     detections = mock(SoundDetectionRepository.class);
     recordings = mock(ListenerRecordingRepository.class);
+    listeners = mock(PlaylistListenerRepository.class);
+    downloader = mock(MusicDownloader.class);
     recognition = mock(AuddRecognitionClient.class);
     executor = mock(TaskExecutor.class);
     service =
         new SoundDetectionService(
-            root, detections, recordings, recognition, executor, Clock.fixed(NOW, ZoneOffset.UTC));
+            root,
+            root.resolve("library"),
+            detections,
+            recordings,
+            listeners,
+            downloader,
+            recognition,
+            executor,
+            Clock.fixed(NOW, ZoneOffset.UTC));
   }
 
   @Test

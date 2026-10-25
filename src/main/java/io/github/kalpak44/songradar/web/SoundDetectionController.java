@@ -1,6 +1,7 @@
 package io.github.kalpak44.songradar.web;
 
 import io.github.kalpak44.songradar.detection.SoundDetectionService;
+import io.github.kalpak44.songradar.detection.SoundDetectionService.DownloadPlanResult;
 import io.github.kalpak44.songradar.detection.SoundDetectionService.ManualAttemptResult;
 import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
@@ -65,5 +66,26 @@ public class SoundDetectionController {
           redirect.addFlashAttribute("errorMessage", "That recording cannot be detected.");
     }
     return "redirect:/recordings";
+  }
+
+  @PostMapping("/detections/{detectionId}/download")
+  public String findAndDownload(
+      @PathVariable long detectionId,
+      org.springframework.web.servlet.mvc.support.RedirectAttributes redirect) {
+    DownloadPlanResult result = service.planDownload(detectionId);
+    switch (result) {
+      case PLANNED ->
+          redirect.addFlashAttribute(
+              "successMessage",
+              "Download plan logged. The current dummy downloader does not create a file yet.");
+      case NOT_FOUND -> redirect.addFlashAttribute("errorMessage", "Detection not found.");
+      case NOT_IDENTIFIED ->
+          redirect.addFlashAttribute("errorMessage", "Only identified tracks can be downloaded.");
+      case RECORDING_EXPIRED ->
+          redirect.addFlashAttribute(
+              "errorMessage",
+              "The source recording has expired, so its listener library folder is unavailable.");
+    }
+    return "redirect:/detections";
   }
 }
