@@ -5,10 +5,14 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,6 +41,10 @@ public class YtDlpTrackSource implements TrackSource {
 
   /** Enough for a slow extraction, short enough that a hung process is not a stuck download. */
   private static final int SEARCH_TIMEOUT_SECONDS = 60;
+
+  /** The extraction directory holds downloaded audio, so only this process may read it. */
+  private static final FileAttribute<Set<PosixFilePermission>> PRIVATE_DIRECTORY =
+      PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
 
   private final String executable;
   private final String ffmpegLocation;
@@ -105,7 +113,7 @@ public class YtDlpTrackSource implements TrackSource {
    * is ffmpeg — which has to be installed beside yt-dlp either way.
    */
   private void download(String id, OutputStream out) throws IOException {
-    Path work = Files.createTempDirectory("songradar-ytdlp-");
+    Path work = Files.createTempDirectory("songradar-ytdlp-", PRIVATE_DIRECTORY);
     try {
       List<String> command =
           new ArrayList<>(
