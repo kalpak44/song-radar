@@ -42,7 +42,24 @@ class SourceAvailabilityTest {
               new JioSaavnTrackSource(),
               List.of(
                   new String[] {"Arijit Singh", "Tum Hi Ho"},
-                  new String[] {"Neha Kakkar", "Dilbar"})));
+                  new String[] {"Neha Kakkar", "Dilbar"})),
+          new Probe(
+              new BandcampTrackSource(),
+              List.of(
+                  new String[] {"Amanda Palmer", "In My Mind"},
+                  new String[] {"Car Seat Headrest", "Something Soon"})),
+          new Probe(
+              new InternetArchiveTrackSource(),
+              List.of(
+                  new String[] {"Scott Joplin", "Maple Leaf Rag"},
+                  new String[] {"Glenn Miller", "In The Mood"})));
+
+  /**
+   * A non-ASCII query is encoded differently by every one of these clients, and getting it wrong
+   * does not fail — it answers with unrelated tracks, which the matcher then rejects as if the
+   * catalogue simply had nothing.
+   */
+  private static final String[] CYRILLIC = {"Кино", "Группа крови"};
 
   record Probe(TrackSource source, List<String[]> queries) {}
 
@@ -65,6 +82,15 @@ class SourceAvailabilityTest {
     }
 
     System.out.printf("%d of %d sources working%n", working.size(), PROBES.size());
+
+    boolean cyrillic =
+        PROBES.stream()
+            .anyMatch(
+                probe -> attempt(new Probe(probe.source(), List.<String[]>of(CYRILLIC))) == null);
+    System.out.printf("non-ASCII search: %s%n", cyrillic ? "OK" : "BROKEN");
+    assertThat(cyrillic)
+        .withFailMessage("No source could download a Cyrillic track — check query encoding.")
+        .isTrue();
     assertThat(broken)
         .withFailMessage(
             "These music sources no longer serve a download: %s. Working: %s. "

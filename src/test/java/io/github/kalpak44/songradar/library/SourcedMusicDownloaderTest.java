@@ -31,15 +31,16 @@ class SourcedMusicDownloaderTest {
   /** Real MP3 bytes: the downloader files only what it can parse, so stub audio has to be audio. */
   @BeforeAll
   static void encodeFixtures() {
-    track = silence(40);
-    clip = silence(5);
+    // Over the size floor the downloader enforces, and well under it.
+    track = silence(90, 320);
+    clip = silence(20, 320);
   }
 
-  private static byte[] silence(int seconds) {
+  private static byte[] silence(int seconds, int kbps) {
     AudioFormat format = new AudioFormat(44100, 16, 2, true, false);
     LameEncoder encoder =
         new LameEncoder(
-            format, 64, LameEncoder.CHANNEL_MODE_AUTO, LameEncoder.QUALITY_LOWEST, false);
+            format, kbps, LameEncoder.CHANNEL_MODE_AUTO, LameEncoder.QUALITY_LOWEST, false);
     byte[] pcm = new byte[encoder.getPCMBufferSize()];
     byte[] encoded = new byte[encoder.getMP3BufferSize()];
     ByteArrayOutputStream mp3 = new ByteArrayOutputStream();
@@ -156,6 +157,15 @@ class SourcedMusicDownloaderTest {
   void rejectsASourceThatAnswersWithSomethingOtherThanAudio() throws IOException {
     new SourcedMusicDownloader(
             List.of(serving("page", "<html>not found</html>".getBytes(StandardCharsets.UTF_8))))
+        .download(detection("Daft Punk", "Get Lucky"), library);
+
+    assertThat(contents()).isEmpty();
+  }
+
+  /** The case that reaches the library as a file far too small to be the track. */
+  @Test
+  void rejectsADownloadThatStoppedPartWayThrough() throws IOException {
+    new SourcedMusicDownloader(List.of(serving("truncated", silence(60, 32))))
         .download(detection("Daft Punk", "Get Lucky"), library);
 
     assertThat(contents()).isEmpty();

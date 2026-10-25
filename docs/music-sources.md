@@ -10,6 +10,8 @@ stops working.
 | 1 | Audius | documented, public | MP3 320 kbps | none |
 | 2 | SoundCloud | undocumented | HLS: MPEG or AAC in fMP4 | only for the AAC variants |
 | 3 | JioSaavn | undocumented | progressive AAC in MP4 | always |
+| 4 | Bandcamp | undocumented | MP3 128 kbps | none |
+| 5 | Internet Archive | documented, public | MP3 | none |
 
 ## What breaks, and where to look
 
@@ -25,6 +27,23 @@ frequently 404s on fetch, so every advertised variant is tried in turn rather th
 read as text and parsed directly. Its media URL is DES-encrypted, but the site's own
 `song.generateAuthToken` endpoint resolves the encrypted path to a signed URL, so the key never has
 to live in this application.
+
+**A query must be handed to the HTTP client as a URI variable, never encoded into the string.**
+A `String` passed to `RestClient.uri` is treated as a template and encoded a second time. It does not
+fail: SoundCloud answers a double-encoded Cyrillic query with ten unrelated uploads, the matcher
+rejects them all, and the source looks like a catalogue that simply does not have the track. Every
+detection from a non-Latin station went undownloaded this way. A pre-built `java.net.URI` is the
+other safe form, and is what the sources that fetch an API-supplied URL use.
+
+**Bandcamp's stream URL is on the track page, not in the search result** — in a `data-tralbum`
+attribute holding HTML-escaped JSON. Its catalogue leans towards remixes and reworks, which is what
+the matcher's marker list is for.
+
+**Internet Archive needs a fielded query.** A bare one matches descriptions and the full text of
+scanned books, so a song title answers with anything that ever mentioned it. Creator is left out of
+the query because it is often absent or spelled differently, and the candidates are scored instead.
+An item is frequently a whole concert, so the file within it is chosen by name — against the title
+alone, since a file inside an artist's item is rarely named after the artist.
 
 **Audius is reached through a discovery node** rather than a fixed host; the registry at
 `api.audius.co` names the ones currently serving.

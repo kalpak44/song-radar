@@ -1,8 +1,6 @@
 package io.github.kalpak44.songradar.library;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
@@ -62,11 +60,9 @@ public class AudiusTrackSource implements TrackSource {
           client
               .get()
               .uri(
-                  node
-                      + "/v1/tracks/search?app_name="
-                      + APP
-                      + "&query="
-                      + URLEncoder.encode((artist + " " + title).trim(), StandardCharsets.UTF_8))
+                  node + "/v1/tracks/search?app_name={app}&query={q}",
+                  APP,
+                  (artist + " " + title).trim())
               .retrieve()
               .body(SearchResponse.class);
       if (response == null || response.data() == null) {

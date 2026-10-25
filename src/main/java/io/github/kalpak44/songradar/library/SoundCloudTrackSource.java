@@ -2,8 +2,7 @@ package io.github.kalpak44.songradar.library;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
+import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -86,13 +85,16 @@ public class SoundCloudTrackSource implements TrackSource {
     if (id == null) {
       return Optional.empty();
     }
-    String query = URLEncoder.encode((artist + " " + title).trim(), StandardCharsets.UTF_8);
+    String query = (artist + " " + title).trim();
     SearchResponse response;
     try {
       response =
           client
               .get()
-              .uri(api + "/search/tracks?q=" + query + "&limit=10&client_id=" + id)
+              // The query goes in as a URI variable so the client encodes it once, correctly.
+              // Encoded by hand into the string it is encoded a second time, and a Cyrillic title
+              // then answers with unrelated uploads rather than with nothing.
+              .uri(api + "/search/tracks?q={q}&limit=10&client_id={id}", query, id)
               .retrieve()
               .body(SearchResponse.class);
     } catch (RuntimeException exception) {
@@ -172,11 +174,9 @@ public class SoundCloudTrackSource implements TrackSource {
                 client
                     .get()
                     .uri(
-                        transcoding.url()
-                            + "?client_id="
-                            + id
-                            + "&track_authorization="
-                            + URLEncoder.encode(authorization, StandardCharsets.UTF_8))
+                        transcoding.url() + "?client_id={id}&track_authorization={auth}",
+                        id,
+                        authorization)
                     .retrieve()
                     .body(StreamResponse.class))
             .map(StreamResponse::url)
@@ -239,12 +239,12 @@ public class SoundCloudTrackSource implements TrackSource {
   }
 
   private byte[] bytes(String url) {
-    byte[] body = client.get().uri(url).retrieve().body(byte[].class);
+    byte[] body = client.get().uri(URI.create(url)).retrieve().body(byte[].class);
     return body == null ? new byte[0] : body;
   }
 
   private String text(String url) {
-    String body = client.get().uri(url).retrieve().body(String.class);
+    String body = client.get().uri(URI.create(url)).retrieve().body(String.class);
     return body == null ? "" : body;
   }
 

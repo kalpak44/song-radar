@@ -37,6 +37,13 @@ public class SourcedMusicDownloader implements MusicDownloader {
    */
   private static final int SHORTEST_TRACK_SECONDS = 30;
 
+  /**
+   * A transfer that stops early still produces a parseable file, and the duration it reports comes
+   * from a header describing the whole track rather than the bytes that arrived — so a truncated
+   * download passes the length check. Its size does not lie.
+   */
+  private static final long SMALLEST_TRACK_BYTES = 2_500_000;
+
   private final List<TrackSource> sources;
   private final ActivityLog activity;
 
@@ -129,6 +136,10 @@ public class SourcedMusicDownloader implements MusicDownloader {
    * length check is the half that catches a stream which started correctly and then stopped.
    */
   private static Mp3File playable(Path file) throws IOException {
+    long size = Files.size(file);
+    if (size < SMALLEST_TRACK_BYTES) {
+      throw new IOException("the download stopped after " + size / 1024 + " KB");
+    }
     Mp3File mp3;
     try {
       mp3 = new Mp3File(file);
