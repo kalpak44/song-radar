@@ -34,7 +34,7 @@
                     Listeners select one channel and capture short samples on an independent schedule.
                 </p>
             </div>
-            <a th:href="@{/playlists/{id}/listeners/new(id=${playlist.id})}"
+            <a th:if="${!#lists.isEmpty(listeners)}" th:href="@{/playlists/{id}/listeners/new(id=${playlist.id})}"
                class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-400 px-4 py-2.5 text-sm font-semibold
                       text-emerald-950 shadow-[0_8px_24px_rgba(52,211,153,0.12)] transition hover:-translate-y-0.5 hover:bg-emerald-300
                       hover:shadow-[0_10px_28px_rgba(52,211,153,0.2)] focus:ring-2 focus:ring-emerald-300/60 focus:outline-none">
@@ -59,19 +59,19 @@
             </div>
 
             <div th:if="${#lists.isEmpty(listeners)}"
-                 class="mt-4 rounded-2xl border border-dashed border-slate-800 bg-slate-900/20 px-6 py-14 text-center">
-                <div class="mx-auto grid size-11 place-items-center rounded-full bg-slate-900 text-slate-500">
+                 class="empty-listener-state mt-4 rounded-2xl border border-dashed border-slate-800/80 bg-slate-900/20 px-6 text-center">
+                <div class="mx-auto grid size-11 place-items-center rounded-full bg-slate-900 text-emerald-300">
                     <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="1.6" aria-hidden="true">
-                        <path d="M4 12h3m10 0h3M7.8 7.8l2.1 2.1m4.2 4.2 2.1 2.1m0-8.4-2.1 2.1m-4.2 4.2-2.1 2.1"/>
-                        <circle cx="12" cy="12" r="2.5"/>
+                         stroke-width="1.7" aria-hidden="true">
+                        <circle cx="12" cy="12" r="8.5"/>
+                        <path d="M10 9.5v5l5-2.5z" fill="currentColor" stroke="none"/>
                     </svg>
                 </div>
                 <h3 class="mt-4 text-sm font-medium text-slate-200">No listeners configured</h3>
                 <p class="mt-1 text-sm text-slate-500">Choose a channel and decide how often SongRadar should listen.</p>
                 <a th:href="@{/playlists/{id}/listeners/new(id=${playlist.id})}"
-                   class="mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-700/70 bg-emerald-950/50 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:border-emerald-500 hover:bg-emerald-900/60 focus:ring-2 focus:ring-emerald-400/50 focus:outline-none">
-                    <span aria-hidden="true">+</span> Add your first listener
+                   class="mt-6 inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-emerald-950 shadow-[0_8px_24px_rgba(52,211,153,0.12)] transition hover:bg-emerald-300 focus:ring-2 focus:ring-emerald-300/60 focus:outline-none">
+                    <span class="text-base leading-none" aria-hidden="true">+</span> Add your first listener
                 </a>
             </div>
 

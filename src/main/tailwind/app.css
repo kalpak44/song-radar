@@ -17,13 +17,55 @@
 }
 
 .channel-option:has(input:checked) {
-  border-color: rgb(6 95 70 / 0.8);
-  background: rgb(2 44 34 / 0.34);
+  border-color: rgb(16 185 129 / 0.7);
+  background: rgb(6 78 59 / 0.28);
 }
 
 .channel-option.is-selected {
-  border-color: rgb(6 95 70 / 0.8);
-  background: rgb(2 44 34 / 0.34);
+  border-color: rgb(16 185 129 / 0.7);
+  background: rgb(6 78 59 / 0.28);
+}
+
+.channel-option {
+  border-color: rgb(51 65 85 / 0.55);
+  background: rgb(2 6 23 / 0.28);
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.channel-option:hover {
+  border-color: rgb(71 85 105 / 0.8);
+  background: rgb(15 23 42 / 0.8);
+}
+
+.channel-option.is-selected .channel-icon {
+  border-color: rgb(16 185 129 / 0.55);
+  background: rgb(6 78 59 / 0.4);
+  color: rgb(110 231 183);
+}
+
+.channel-option.is-selected .channel-name {
+  color: rgb(241 245 249);
+  font-weight: 600;
+}
+
+.channel-selected-indicator {
+  border: 1px solid rgb(16 185 129 / 0.45);
+  border-radius: 9999px;
+  color: rgb(110 231 183);
+  font-size: 0.7rem;
+  line-height: 1;
+  padding: 0.3rem 0.5rem;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.channel-option.is-selected .channel-selected-indicator {
+  opacity: 1;
+}
+
+.empty-listener-state {
+  min-height: 15rem;
+  padding-block: 2.25rem;
 }
 
 .channel-option:focus-within {
