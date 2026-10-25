@@ -27,19 +27,28 @@ read as text and parsed directly. Its media URL is DES-encrypted with a key the 
 **Audius is reached through a discovery node** rather than a fixed host; the registry at
 `api.audius.co` names the ones currently serving.
 
-## Known defect: the AAC transcode is not faithful
+## HE-AAC is rejected, not ranked last
 
-Measured against CoreAudio decoding the same bytes, the AAC path produces audio with silent gaps
-punched through it and a missing high band. It is not an encoding fault — dumping the decoder's PCM
-straight to WAV shows the same gaps before the MP3 encoder sees it.
+The transcoder decodes AAC-LC faithfully and HE-AAC badly, and the difference was measured against
+CoreAudio decoding the same bytes: AAC-LC reproduces the reference envelope at 0.95 correlation with
+the same zero-crossing rate, while HE-AAC comes back at 0.3 with silent gaps punched through it and
+the high band missing. Dumping the decoder's PCM straight to WAV shows those gaps before the MP3
+encoder sees them, so it is the decoder, not the encoding — this build reconstructs no spectral band
+replication.
 
-What has been ruled out: sample byte order (the decoder emits big-endian unless told otherwise, and
-that is now set explicitly), the `trun` `data_offset` (now honoured), truncated or failed frames
-(every frame decodes and yields a full 1024 samples), and the sample rate.
+Nothing about the resulting file gives it away. It is the right length, the right sample rate, and
+parses as valid MP3, so the length and format checks in `SourcedMusicDownloader` pass. Only listening
+to it catches it.
 
-What has not been ruled out: SBR. The 96 kbps SoundCloud variant is HE-AAC, and a decoder that
-ignores its spectral band replication produces exactly this — quiet, dull audio. The transcodings are
-therefore ordered so that anything needing no transcode is preferred, then AAC-LC, then HE-AAC last.
+So HE-AAC variants are filtered out of the candidate list entirely rather than tried last. An upload
+offering nothing else is passed over while searching, which lets a lower-scoring upload that can be
+transcoded faithfully take its place, and a track available nowhere but HE-AAC is simply not
+downloaded. No file beats a file of noise.
+
+Ruled out while chasing this, and worth not re-checking: sample byte order (the decoder emits
+big-endian unless told otherwise, which is now set explicitly), the `trun` `data_offset` (now
+honoured), dropped or failed frames (every frame decodes to a full 1024 samples), and the sample
+rate.
 
 ## Reference implementation
 

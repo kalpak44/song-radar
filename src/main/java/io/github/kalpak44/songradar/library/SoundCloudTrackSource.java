@@ -35,6 +35,12 @@ public class SoundCloudTrackSource implements TrackSource {
   private static final Pattern ASSET =
       Pattern.compile("https://a-v2\\.sndcdn\\.com/assets/[^\"]+\\.js");
   private static final Pattern CLIENT_ID = Pattern.compile("client_id[:=]\"([A-Za-z0-9]{25,})\"");
+
+  /**
+   * AAC presets this decoder reproduces faithfully. Everything else SoundCloud offers is HE-AAC.
+   */
+  private static final List<String> LOSSLESSLY_DECODED = List.of("aac_160k", "aac_256k");
+
   private final RestClient client;
   private volatile String clientId;
 
@@ -92,6 +98,9 @@ public class SoundCloudTrackSource implements TrackSource {
     }
     return response.collection().stream()
         .filter(track -> track.media() != null && track.track_authorization() != null)
+        // An upload offering nothing but HE-AAC is passed over here rather than ranked last,
+        // so a lower-scoring upload that can be transcoded faithfully still gets its turn.
+        .filter(track -> !usable(track).isEmpty())
         .max(java.util.Comparator.comparingDouble(track -> score(track, artist, title)))
         .filter(track -> score(track, artist, title) >= TrackMatching.MINIMUM_SCORE)
         .map(track -> toSourceTrack(track, artist, id));
@@ -106,19 +115,8 @@ public class SoundCloudTrackSource implements TrackSource {
         out -> write(track, id, out));
   }
 
-  /**
-   * Ordered by how much has to be done to the bytes: MPEG is copied through, plain AAC decodes
-   * faithfully, and the 96k variant is HE-AAC whose high band this decoder does not reconstruct. An
-   * upload can also advertise a variant it will not serve, which arrives as a 404 on the stream
-   * rather than as a missing transcoding, so each is tried in turn.
-   */
   private void write(Track track, String id, OutputStream out) throws IOException {
-    List<Transcoding> candidates =
-        track.media().transcodings().stream()
-            .filter(t -> t.format() != null && "hls".equals(t.format().protocol()))
-            .sorted(java.util.Comparator.comparingInt(SoundCloudTrackSource::fidelity))
-            .toList();
-    for (Transcoding transcoding : candidates) {
+    for (Transcoding transcoding : usable(track)) {
       try {
         writeTranscoding(transcoding, track.track_authorization(), id, out);
         return;
@@ -132,12 +130,21 @@ public class SoundCloudTrackSource implements TrackSource {
     throw new IOException("no advertised stream could be fetched");
   }
 
-  /** Lower is better: no transcode, then AAC-LC, then HE-AAC. */
-  private static int fidelity(Transcoding transcoding) {
-    if (isMpeg(transcoding)) {
-      return 0;
-    }
-    return "aac_160k".equals(transcoding.preset()) ? 1 : 2;
+  /**
+   * The variants worth fetching, MPEG first because it is copied through rather than decoded.
+   * HE-AAC is excluded outright: this decoder does not reconstruct its high band, and the result is
+   * audible noise at the right length, which no check on the file can catch. An upload with nothing
+   * else is left to another source — no file beats a bad one.
+   *
+   * <p>An upload can also advertise a variant it will not serve, which arrives as a 404 on the
+   * stream rather than as a missing transcoding, so the survivors are still tried in turn.
+   */
+  private static List<Transcoding> usable(Track track) {
+    return track.media().transcodings().stream()
+        .filter(t -> t.format() != null && "hls".equals(t.format().protocol()))
+        .filter(t -> isMpeg(t) || LOSSLESSLY_DECODED.contains(t.preset()))
+        .sorted(java.util.Comparator.comparingInt(t -> isMpeg(t) ? 0 : 1))
+        .toList();
   }
 
   /** MPEG playlists come labelled both audio/mpeg and audio/mpegurl. */
