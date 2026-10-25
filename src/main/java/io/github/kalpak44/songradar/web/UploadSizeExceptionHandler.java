@@ -1,5 +1,6 @@
 package io.github.kalpak44.songradar.web;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -13,8 +14,11 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class UploadSizeExceptionHandler {
 
   @ExceptionHandler(MaxUploadSizeExceededException.class)
-  public String handleTooLarge(RedirectAttributes redirect) {
+  public String handleTooLarge(RedirectAttributes redirect, HttpServletRequest request) {
     redirect.addFlashAttribute("errorMessage", "That file is too large.");
-    return "redirect:/settings";
+    if (!request.getRequestURI().equals("/files/upload")) return "redirect:/settings";
+    return request.getQueryString() != null && request.getQueryString().contains("scope=library")
+        ? "redirect:/library"
+        : "redirect:/";
   }
 }

@@ -18,10 +18,9 @@ spring:
 
   servlet:
     multipart:
-      # An M3U playlist is text. A cap this low keeps a mistaken upload from filling the
-      # volume, and the handler turns the rejection into a message on the page.
-      max-file-size: 16MB
-      max-request-size: 16MB
+      # Music library uploads may be large; the storage PVC remains the overall capacity limit.
+      max-file-size: ${SONGRADAR_UPLOAD_MAX_FILE_SIZE:100MB}
+      max-request-size: ${SONGRADAR_UPLOAD_MAX_REQUEST_SIZE:500MB}
 
   # Spring Data JDBC never creates tables, so Flyway owns the schema outright.
   flyway:
