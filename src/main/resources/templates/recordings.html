@@ -125,17 +125,29 @@
                                     </p>
                                 </div>
                             </div>
-                            <form method="post"
-                                  th:action="@{/playlists/{playlistId}/listeners/{listenerId}/recordings/{recordingId}/delete(playlistId=${group.playlistId},listenerId=${group.listenerId},recordingId=${recording.id})}"
-                                  onsubmit="return confirm('Delete this recording and its audio file? This cannot be undone.');">
-                                <button type="submit" aria-label="Delete recording"
-                                        class="inline-flex items-center gap-2 rounded-lg border border-red-950/80 px-3 py-2 text-xs font-medium text-slate-400 transition hover:border-red-800/80 hover:bg-red-950/35 hover:text-red-200 focus-visible:outline-2 focus-visible:outline-red-400">
-                                    <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                                        <path d="M4 7h16M10 11v6m4-6v6M5.5 7l1 13h11l1-13M9 7V4h6v3"/>
-                                    </svg>
-                                    Delete
-                                </button>
-                            </form>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <form th:if="${recording.playable}" method="post"
+                                      th:action="@{/recordings/{recordingId}/detect(recordingId=${recording.id})}">
+                                    <button type="submit"
+                                            class="inline-flex items-center gap-2 rounded-lg border border-emerald-800/60 bg-emerald-950/25 px-3 py-2 text-xs font-medium text-emerald-200 transition hover:border-emerald-600/80 hover:bg-emerald-950/50 focus-visible:outline-2 focus-visible:outline-emerald-400">
+                                        <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                            <path d="M4 10v4m4-7v10m4-14v18m4-14v10m4-7v4"/><path d="m16 5 1.5 1.5L21 3"/>
+                                        </svg>
+                                        Detect
+                                    </button>
+                                </form>
+                                <form method="post"
+                                      th:action="@{/playlists/{playlistId}/listeners/{listenerId}/recordings/{recordingId}/delete(playlistId=${group.playlistId},listenerId=${group.listenerId},recordingId=${recording.id})}"
+                                      onsubmit="return confirm('Delete this recording and its audio file? This cannot be undone.');">
+                                    <button type="submit" aria-label="Delete recording"
+                                            class="inline-flex items-center gap-2 rounded-lg border border-red-950/80 px-3 py-2 text-xs font-medium text-slate-400 transition hover:border-red-800/80 hover:bg-red-950/35 hover:text-red-200 focus-visible:outline-2 focus-visible:outline-red-400">
+                                        <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                            <path d="M4 7h16M10 11v6m4-6v6M5.5 7l1 13h11l1-13M9 7V4h6v3"/>
+                                        </svg>
+                                        Delete
+                                    </button>
+                                </form>
+                            </div>
                         </div>
 
                         <audio th:if="${recording.playable}" controls preload="none"

@@ -44,3 +44,8 @@ songradar:
     recordings: ${songradar.storage.path}/recordings
   listeners:
     scheduler-threads: ${SONGRADAR_LISTENER_THREADS:2}
+  recognition:
+    worker-threads: ${SONGRADAR_RECOGNITION_THREADS:1}
+    audd:
+      # Optional. Set a token to recognize new WAV captures.
+      api-token: ${SONGRADAR_AUDD_API_TOKEN:}

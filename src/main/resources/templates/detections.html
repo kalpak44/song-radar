@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" th:replace="~{layout :: page('Sound detections', ~{:: #content})}"
+      xmlns:th="http://www.thymeleaf.org">
+<body>
+<main id="content" class="min-w-0 flex-1 px-5 py-6 sm:px-7 lg:px-10 lg:py-9">
+    <div class="mx-auto max-w-5xl">
+        <section class="relative overflow-hidden rounded-2xl border border-slate-800/90 bg-slate-900/35 p-6 sm:p-8">
+            <div class="pointer-events-none absolute -top-24 right-8 size-64 rounded-full bg-emerald-400/5 blur-3xl"></div>
+            <div class="relative flex flex-wrap items-end justify-between gap-5">
+                <div>
+                    <p class="font-mono text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-emerald-400/90">Song recognition</p>
+                    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-50">Sound detections</h1>
+                    <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">Tracks identified from listener recordings, with repeat detections grouped into one entry.</p>
+                </div>
+                <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-right">
+                    <p class="font-mono text-xl text-slate-100" th:text="${total}">0</p>
+                    <p class="text-xs text-slate-500">unique detections</p>
+                </div>
+            </div>
+        </section>
+
+        <div th:unless="${configured}" role="status" class="mt-5 rounded-xl border border-amber-900/60 bg-amber-950/25 px-4 py-3 text-sm leading-6 text-amber-100/90">
+            Recognition is not configured yet. Set <code class="rounded bg-black/30 px-1.5 py-0.5 font-mono text-amber-200">SONGRADAR_AUDD_API_TOKEN</code> to identify new recordings. AudD offers a limited free trial; requests beyond it may require a paid plan.
+        </div>
+        <div th:if="${configured and pendingCount > 0}" role="status" class="mt-5 rounded-xl border border-sky-900/60 bg-sky-950/25 px-4 py-3 text-sm text-sky-100/90">
+            <span th:text="|${pendingCount} recording${pendingCount == 1 ? '' : 's'} waiting for recognition.|">Waiting for recognition.</span>
+        </div>
+
+        <section th:if="${#lists.isEmpty(rows)}" class="mt-7 rounded-2xl border border-dashed border-slate-800 bg-slate-900/15 px-6 py-16 text-center">
+            <span class="mx-auto grid size-12 place-items-center rounded-2xl border border-slate-800 bg-slate-950 text-emerald-300">
+                <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 10v4m4-7v10m4-14v18m4-14v10m4-7v4"/><path d="m16 5 1.5 1.5L21 3"/></svg>
+            </span>
+            <h2 class="mt-4 text-base font-medium text-slate-200">No detections yet</h2>
+            <p class="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500">Completed listener recordings will be checked automatically and recognized tracks will appear here.</p>
+            <a th:href="@{/recordings}" class="mt-5 inline-flex text-sm font-medium text-emerald-300 hover:text-emerald-200">Browse recordings <span aria-hidden="true">↗</span></a>
+        </section>
+
+        <section th:unless="${#lists.isEmpty(rows)}" class="mt-7 overflow-hidden rounded-2xl border border-slate-800/90 bg-slate-900/25">
+            <div class="flex items-center justify-between border-b border-slate-800/80 px-5 py-4 sm:px-6">
+                <div><h2 class="text-sm font-medium text-slate-100">Identified tracks &amp; attempts</h2><p class="mt-1 text-xs text-slate-500">Newest activity first · repeat tracks are grouped</p></div>
+                <span class="rounded-full border border-slate-700/70 px-2.5 py-1 font-mono text-[0.68rem] text-slate-400" th:text="|${total} entries|">0 entries</span>
+            </div>
+            <div class="divide-y divide-slate-800/70">
+                <article th:each="row : ${rows}" class="flex flex-wrap items-start justify-between gap-4 px-5 py-5 sm:px-6">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl border border-emerald-900/50 bg-emerald-950/30 text-emerald-300">
+                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                        </span>
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="truncate text-sm font-semibold text-slate-100" th:text="${row.detection.title != null ? row.detection.title : 'Track not identified'}">Track title</h3>
+                                <span th:if="${row.detection.status.name() == 'MATCHED'}" class="rounded-full border border-emerald-800/60 bg-emerald-950/35 px-2 py-0.5 text-[0.65rem] font-medium text-emerald-300">IDENTIFIED</span>
+                                <span th:if="${row.detection.status.name() == 'PENDING'}" class="rounded-full border border-sky-800/60 bg-sky-950/35 px-2 py-0.5 text-[0.65rem] font-medium text-sky-300">PENDING</span>
+                                <span th:if="${row.detection.status.name() == 'NO_MATCH'}" class="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[0.65rem] font-medium text-slate-400">NO MATCH</span>
+                                <span th:if="${row.detection.status.name() == 'FAILED' or row.detection.status.name() == 'UNAVAILABLE'}" class="rounded-full border border-amber-900/60 bg-amber-950/30 px-2 py-0.5 text-[0.65rem] font-medium text-amber-200">UNAVAILABLE</span>
+                            </div>
+                            <p class="mt-1 text-sm text-slate-400" th:if="${row.detection.artist != null}" th:text="${row.detection.artist}">Artist</p>
+                            <p class="mt-1 text-xs leading-5 text-slate-500" th:if="${row.detection.album != null}" th:text="${row.detection.album}">Album</p>
+                            <p class="mt-2 text-xs text-slate-500">
+                                <span th:text="${row.channelName}">Channel</span> <span aria-hidden="true">·</span> <span th:text="${row.listenerName}">Listener</span> <span aria-hidden="true">·</span> <span th:text="${row.playlistName}">Playlist</span>
+                            </p>
+                            <p th:if="${row.detection.errorMessage != null}" class="mt-2 max-w-2xl text-xs text-amber-200/75" th:text="${row.detection.errorMessage}">Provider error</p>
+                        </div>
+                    </div>
+                    <div class="ml-12 flex min-w-40 flex-col items-start gap-2 text-xs text-slate-500 sm:ml-0 sm:items-end">
+                        <span><span th:text="${row.detection.detectionCount}">1</span> <span th:text="${row.detection.detectionCount == 1 ? 'detection' : 'detections'}">detections</span></span>
+                        <time data-local-time="compact" th:if="${row.recordedAt != null}" th:attr="datetime=${row.recordedAt}">Recently</time>
+                        <span th:if="${row.recordedAt == null}" class="text-slate-600">Recording removed</span>
+                        <a th:if="${row.detection.trackUrl != null}" th:href="${row.detection.trackUrl}" target="_blank" rel="noreferrer" class="font-medium text-emerald-300 transition hover:text-emerald-200">Open track ↗</a>
+                        <a th:if="${row.playlistId != null and row.listenerId != null and row.recordingId != null}" th:href="@{/playlists/{playlistId}/listeners/{listenerId}/recordings/{recordingId}/audio(playlistId=${row.playlistId},listenerId=${row.listenerId},recordingId=${row.recordingId})}" class="font-medium text-slate-400 transition hover:text-slate-200">Play source recording</a>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <nav th:if="${totalPages > 1}" aria-label="Detection pages" class="mt-6 flex items-center justify-between rounded-xl border border-slate-800/80 bg-slate-900/20 px-4 py-3">
+            <a th:if="${currentPage > 1}" th:href="@{/detections(page=${currentPage - 1})}" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500">Previous</a>
+            <span th:unless="${currentPage > 1}" class="rounded-lg border border-slate-800 px-3 py-2 text-sm text-slate-600">Previous</span>
+            <span class="font-mono text-xs text-slate-400" th:text="|${currentPage} / ${totalPages}|">1 / 1</span>
+            <a th:if="${currentPage < totalPages}" th:href="@{/detections(page=${currentPage + 1})}" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500">Next</a>
+            <span th:unless="${currentPage < totalPages}" class="rounded-lg border border-slate-800 px-3 py-2 text-sm text-slate-600">Next</span>
+        </nav>
+    </div>
+</main>
+</body>
+</html>

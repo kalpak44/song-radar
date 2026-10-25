@@ -3,9 +3,9 @@
 Self-hosted music discovery from IPTV and radio streams. Automatically identify songs, find available
 audio, and manage your personal music library.
 
-> **Status: early development.** Playlist sources, scheduled channel listeners, and storage
-> settings are available; playback, recognition, library management, and authentication are still
-> to come.
+> **Status: early development.** Playlist sources, scheduled channel listeners, storage settings,
+> recordings, and sound detections are available; music library management and authentication are
+> still to come.
 
 Java 25 · Spring Boot 4.1 (Web MVC, Thymeleaf, Data JDBC) · PostgreSQL · Tailwind CSS 4
 
@@ -31,7 +31,8 @@ fails there rather than on the first page that reads from it.
 All environment variables, defaulted for local development in `.env.example`:
 `SONGRADAR_DB_HOST`, `SONGRADAR_DB_PORT`, `SONGRADAR_DB_NAME`, `SONGRADAR_DB_USERNAME`,
 `SONGRADAR_DB_PASSWORD`, `SONGRADAR_PORT`, `SONGRADAR_TEMPLATE_CACHE`, and
-`SONGRADAR_STORAGE_PATH`, `SONGRADAR_STORAGE_CAPACITY_GB`, and `SONGRADAR_LISTENER_THREADS`.
+`SONGRADAR_STORAGE_PATH`, `SONGRADAR_STORAGE_CAPACITY_GB`, `SONGRADAR_LISTENER_THREADS`, and the
+optional `SONGRADAR_AUDD_API_TOKEN`.
 
 `SONGRADAR_DB_PASSWORD` has no default — a fallback password is one that reaches production unnoticed.
 `SONGRADAR_STORAGE_PATH` points at the writable mounted volume. The application defaults to `/data`
@@ -40,6 +41,11 @@ for the cluster; `.env.example` selects `./data` for local development.
 where filesystem statistics describe the whole server rather than the application's volume.
 `SONGRADAR_LISTENER_THREADS` controls how many different listeners may record concurrently. A
 single listener always waits for its current recording to finish before scheduling its next one.
+`SONGRADAR_RECOGNITION_THREADS` controls the separate background recognition worker pool.
+Set `SONGRADAR_AUDD_API_TOKEN` to enable automatic song recognition for new WAV recordings. The
+Sound detections page groups repeated matches by normalized artist and title. Without a token,
+recordings are still saved and listed as recognition unavailable. AudD currently offers a limited
+free trial; ongoing usage may require a paid plan.
 
 ## Checks
 

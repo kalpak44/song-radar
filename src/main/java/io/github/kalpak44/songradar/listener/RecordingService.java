@@ -1,5 +1,6 @@
 package io.github.kalpak44.songradar.listener;
 
+import io.github.kalpak44.songradar.detection.SoundDetectionService;
 import io.github.kalpak44.songradar.storage.StorageService;
 import java.io.IOException;
 import java.net.URI;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +27,23 @@ public class RecordingService {
   private final ListenerRecordingRepository recordings;
   private final StorageService storage;
   private final Clock clock;
+  private final SoundDetectionService soundDetections;
+
+  @Autowired
+  public RecordingService(
+      @Value("${songradar.storage.recordings}") Path root,
+      StreamRecordingClient client,
+      ListenerRecordingRepository recordings,
+      StorageService storage,
+      Clock clock,
+      SoundDetectionService soundDetections) {
+    this.root = root.toAbsolutePath().normalize();
+    this.client = client;
+    this.recordings = recordings;
+    this.storage = storage;
+    this.clock = clock;
+    this.soundDetections = soundDetections;
+  }
 
   public RecordingService(
       @Value("${songradar.storage.recordings}") Path root,
@@ -32,11 +51,7 @@ public class RecordingService {
       ListenerRecordingRepository recordings,
       StorageService storage,
       Clock clock) {
-    this.root = root.toAbsolutePath().normalize();
-    this.client = client;
-    this.recordings = recordings;
-    this.storage = storage;
-    this.clock = clock;
+    this(root, client, recordings, storage, clock, null);
   }
 
   public RecordingAttempt record(PlaylistListener listener) {
@@ -52,14 +67,22 @@ public class RecordingService {
               stem,
               Duration.ofSeconds(listener.recordingDurationSeconds()));
       Instant completed = clock.instant();
-      recordings.save(
-          ListenerRecording.completed(
-              listener.id(),
-              root.relativize(capture.path()).toString(),
-              started,
-              completed,
-              Files.size(capture.path()),
-              capture.durationMillis()));
+      ListenerRecording saved =
+          recordings.save(
+              ListenerRecording.completed(
+                  listener.id(),
+                  root.relativize(capture.path()).toString(),
+                  started,
+                  completed,
+                  Files.size(capture.path()),
+                  capture.durationMillis()));
+      if (soundDetections != null) {
+        try {
+          soundDetections.enqueue(saved);
+        } catch (RuntimeException e) {
+          log.warn("Could not queue sound detection for recording {}", saved.id(), e);
+        }
+      }
       try {
         enforceRetention(listener.id(), storage.recordsPerListener());
       } catch (IOException | RuntimeException e) {
