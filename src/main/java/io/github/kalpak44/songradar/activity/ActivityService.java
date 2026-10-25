@@ -53,6 +53,13 @@ public class ActivityService implements ActivityLog {
     return events.findSince(clock.instant().minus(Duration.ofDays(1)), PAGE_LIMIT);
   }
 
+  /** Returns how many entries were removed, so the page can say what it did. */
+  public long clear() {
+    long removed = events.count();
+    events.deleteAll();
+    return removed;
+  }
+
   public int pageLimit() {
     return PAGE_LIMIT;
   }

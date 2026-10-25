@@ -12,9 +12,21 @@
                     <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-50">Sound detections</h1>
                     <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">Tracks identified from listener recordings, with repeat detections grouped into one entry.</p>
                 </div>
-                <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-right">
-                    <p class="font-mono text-xl text-slate-100" th:text="${total}">0</p>
-                    <p class="text-xs text-slate-500">unique detections</p>
+                <div class="flex items-center gap-3">
+                    <form th:if="${total > 0}" method="post" th:action="@{/detections/clear}"
+                          onsubmit="return confirm('Clear every sound detection? This cannot be undone.');">
+                        <button type="submit"
+                                class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-red-900/70 bg-red-950/25 px-3 py-2 text-sm font-medium text-red-200 transition hover:border-red-700 hover:bg-red-950/60">
+                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <path d="M4 7h16M10 11v6m4-6v6M5.5 7l1 13h11l1-13M9 7V4h6v3"/>
+                            </svg>
+                            Clear all
+                        </button>
+                    </form>
+                    <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-right">
+                        <p class="font-mono text-xl text-slate-100" th:text="${total}">0</p>
+                        <p class="text-xs text-slate-500">unique detections</p>
+                    </div>
                 </div>
             </div>
         </section>

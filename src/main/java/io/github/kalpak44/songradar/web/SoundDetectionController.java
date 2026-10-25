@@ -68,6 +68,17 @@ public class SoundDetectionController {
     return "redirect:/recordings";
   }
 
+  @PostMapping("/detections/clear")
+  public String clear(org.springframework.web.servlet.mvc.support.RedirectAttributes redirect) {
+    long removed = service.clear();
+    redirect.addFlashAttribute(
+        "successMessage",
+        removed == 0
+            ? "There was nothing to clear."
+            : "Cleared " + removed + (removed == 1 ? " detection." : " detections."));
+    return "redirect:/detections";
+  }
+
   @PostMapping("/detections/{detectionId}/download")
   public String findAndDownload(
       @PathVariable long detectionId,

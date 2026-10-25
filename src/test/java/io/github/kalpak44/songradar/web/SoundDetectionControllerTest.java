@@ -243,4 +243,14 @@ class SoundDetectionControllerTest {
       return Clock.fixed(NOW, ZoneOffset.UTC);
     }
   }
+
+  @Test
+  void clearingDetectionsSaysHowManyWentAway() throws Exception {
+    when(service.clear()).thenReturn(4L);
+
+    mockMvc
+        .perform(post("/detections/clear"))
+        .andExpect(redirectedUrl("/detections"))
+        .andExpect(flash().attribute("successMessage", "Cleared 4 detections."));
+  }
 }

@@ -7,6 +7,7 @@ import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
 import io.github.kalpak44.songradar.listener.PlaylistListener;
 import io.github.kalpak44.songradar.listener.PlaylistListenerRepository;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.Normalizer;
@@ -277,6 +278,31 @@ public class SoundDetectionService {
                 log.info(
                     "Skipped the download for detection {}: its listener is no longer available",
                     detection.id()));
+    discardRecording(detection.recordingId());
+  }
+
+  /**
+   * The recording existed to be identified, and it has been. Keeping it costs the volume a WAV per
+   * detection and buys nothing — the detection row holds everything the pages read, and the track
+   * itself is in the library by now.
+   */
+  private void discardRecording(long recordingId) {
+    recordings
+        .findById(recordingId)
+        .ifPresent(
+            recording -> {
+              try {
+                if (recording.filePath() != null) {
+                  Path audio = root.resolve(recording.filePath()).normalize();
+                  if (audio.startsWith(root)) {
+                    Files.deleteIfExists(audio);
+                  }
+                }
+                recordings.deleteById(recordingId);
+              } catch (IOException | RuntimeException exception) {
+                log.warn("Could not discard recording {}", recordingId, exception);
+              }
+            });
   }
 
   /** Null when the recording or its listener has since been removed. */
@@ -351,6 +377,13 @@ public class SoundDetectionService {
 
   public boolean isConfigured() {
     return recognition.isConfigured();
+  }
+
+  /** Returns how many rows went away, so the page can say what it did. */
+  public long clear() {
+    long removed = detections.count();
+    detections.deleteAll();
+    return removed;
   }
 
   public DownloadPlanResult planDownload(long detectionId) {

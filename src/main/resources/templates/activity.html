@@ -12,13 +12,26 @@
                     <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-50">Activity</h1>
                     <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">Every step a track takes: captured from a stream, identified, looked for in each music source, and filed in the library.</p>
                 </div>
-                <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-right">
-                    <p class="font-mono text-xl text-slate-100" th:text="${#lists.size(rows)}">0</p>
-                    <p class="text-xs text-slate-500">entries</p>
+                <div class="flex items-center gap-3">
+                    <form th:if="${not #lists.isEmpty(rows)}" method="post" th:action="@{/activity/clear}"
+                          onsubmit="return confirm('Clear the whole activity feed? This cannot be undone.');">
+                        <button type="submit"
+                                class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-red-900/70 bg-red-950/25 px-3 py-2 text-sm font-medium text-red-200 transition hover:border-red-700 hover:bg-red-950/60">
+                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <path d="M4 7h16M10 11v6m4-6v6M5.5 7l1 13h11l1-13M9 7V4h6v3"/>
+                            </svg>
+                            Clear all
+                        </button>
+                    </form>
+                    <div class="rounded-xl border border-slate-800 bg-slate-950/70 px-4 py-3 text-right">
+                        <p class="font-mono text-xl text-slate-100" th:text="${#lists.size(rows)}">0</p>
+                        <p class="text-xs text-slate-500">entries</p>
+                    </div>
                 </div>
             </div>
         </section>
 
+        <div th:if="${successMessage}" role="status" class="mt-5 rounded-xl border border-emerald-900/60 bg-emerald-950/25 px-4 py-3 text-sm text-emerald-100/90" th:text="${successMessage}">Cleared.</div>
         <div th:if="${truncated}" role="status" class="mt-5 rounded-xl border border-sky-900/60 bg-sky-950/25 px-4 py-3 text-sm text-sky-100/90">
             Only the most recent entries are shown; the day has more than this page holds.
         </div>

@@ -81,6 +81,15 @@ class ActivityServiceTest {
   }
 
   @Test
+  void clearingReportsHowManyEntriesItRemoved() {
+    when(events.count()).thenReturn(12L);
+
+    assertThat(service.clear()).isEqualTo(12);
+
+    verify(events).deleteAll();
+  }
+
+  @Test
   void prunesOlderThanTheRetentionWindow() {
     when(events.deleteOlderThan(any())).thenReturn(3);
 

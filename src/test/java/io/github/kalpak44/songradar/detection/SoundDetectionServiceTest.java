@@ -99,6 +99,33 @@ class SoundDetectionServiceTest {
   }
 
   @Test
+  void clearingReportsHowManyDetectionsItRemoved() {
+    when(detections.count()).thenReturn(31L);
+
+    assertThat(service.clear()).isEqualTo(31);
+
+    verify(detections).deleteAll();
+  }
+
+  /** The recording existed to be identified; once it has been, it only costs volume space. */
+  @Test
+  void identifiedRecordingIsDiscardedWithItsAudio() throws Exception {
+    java.nio.file.Path audio = root.resolve("14.wav");
+    java.nio.file.Files.createDirectories(root);
+    java.nio.file.Files.writeString(audio, "audio");
+    ListenerRecording recording =
+        new ListenerRecording(
+            14L, 3L, "14.wav", NOW, NOW, RecordingStatus.COMPLETED, 5, 1000, null);
+    when(recordings.findById(14L)).thenReturn(Optional.of(recording));
+    when(detections.findByTrackKey("artist|song")).thenReturn(Optional.empty());
+
+    service.saveMatched(pending(10L, 14L), Map.of("title", "Song", "artist", "Artist"));
+
+    verify(recordings).deleteById(14L);
+    assertThat(java.nio.file.Files.exists(audio)).isFalse();
+  }
+
+  @Test
   void firstTrackMatchKeepsThePendingRow() {
     SoundDetection pending = pending(10L, 14L);
     when(detections.findByTrackKey("artist|song")).thenReturn(Optional.empty());

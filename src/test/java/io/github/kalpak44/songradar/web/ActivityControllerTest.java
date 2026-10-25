@@ -2,8 +2,11 @@ package io.github.kalpak44.songradar.web;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.flash;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
@@ -81,5 +84,24 @@ class ActivityControllerTest {
         .andExpect(model().attribute("truncated", true))
         .andExpect(
             content().string(Matchers.containsString("Only the most recent entries are shown")));
+  }
+
+  @Test
+  void clearingTheFeedSaysHowMuchWentAway() throws Exception {
+    when(activity.clear()).thenReturn(7L);
+
+    mockMvc
+        .perform(post("/activity/clear"))
+        .andExpect(redirectedUrl("/activity"))
+        .andExpect(flash().attribute("successMessage", "Cleared 7 entries."));
+  }
+
+  @Test
+  void clearingAnEmptyFeedSaysSo() throws Exception {
+    when(activity.clear()).thenReturn(0L);
+
+    mockMvc
+        .perform(post("/activity/clear"))
+        .andExpect(flash().attribute("successMessage", "There was nothing to clear."));
   }
 }
