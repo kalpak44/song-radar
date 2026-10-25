@@ -47,28 +47,40 @@
                             <circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>
                         </svg>
                         <input id="channel-search" type="search" autocomplete="off" placeholder="Search channels by name..."
-                               class="w-full rounded-lg border border-slate-700 bg-slate-950/70 py-2.5 pr-3 pl-10 text-sm
-                                      text-slate-100 placeholder:text-slate-600 focus:border-emerald-600
-                                      focus:ring-1 focus:ring-emerald-600 focus:outline-none">
+                               aria-label="Search channels"
+                               class="channel-search w-full rounded-lg border border-slate-700 bg-slate-950/70 py-3 pr-11 pl-10 text-sm
+                                      text-slate-100 placeholder:text-slate-500 focus:border-emerald-500
+                                      focus:ring-2 focus:ring-emerald-500/25 focus:outline-none">
+                        <button id="clear-channel-search" type="button" aria-label="Clear channel search"
+                                class="absolute top-1/2 right-2 hidden size-7 -translate-y-1/2 items-center justify-center
+                                       rounded-md text-slate-500 transition hover:bg-slate-800 hover:text-slate-200
+                                       focus-visible:outline-2 focus-visible:outline-emerald-400">
+                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" aria-hidden="true">
+                                <path d="m6 6 12 12M18 6 6 18"/>
+                            </svg>
+                        </button>
                     </div>
 
-                    <div id="channel-list" class="mt-3 max-h-80 space-y-1 overflow-y-auto rounded-xl border border-slate-800 bg-black/20 p-1.5">
+                    <div id="channel-list" class="mt-3 max-h-80 space-y-1 overflow-y-auto rounded-xl border border-slate-800 bg-black/20 p-1.5"
+                         role="radiogroup" aria-label="Choose a playlist channel">
                         <label th:each="channel : ${channels}" data-channel-row
                                th:attr="data-search=${#strings.toLowerCase(channel.name)}"
-                               class="group relative flex cursor-pointer items-center gap-3 rounded-lg px-3 py-3 transition hover:bg-slate-900">
+                               class="channel-option group relative flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-3 py-3 transition hover:border-slate-700 hover:bg-slate-900 has-checked:border-emerald-800/80 has-checked:bg-emerald-950/25">
                             <input type="radio" th:field="*{channelUrl}" th:value="${channel.streamUrl}"
                                    class="peer sr-only">
-                            <span class="grid size-8 shrink-0 place-items-center rounded-lg border border-slate-800 bg-slate-900
-                                         text-slate-500 transition peer-checked:border-emerald-700 peer-checked:text-emerald-400">
+                            <span class="grid size-9 shrink-0 place-items-center rounded-lg border border-slate-800 bg-slate-900
+                                         text-slate-500 transition peer-checked:border-emerald-700 peer-checked:bg-emerald-950/50 peer-checked:text-emerald-300">
                                 <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                      stroke-width="1.7" aria-hidden="true">
                                     <path d="M8 9a5 5 0 0 0 0 6M5 6a9 9 0 0 0 0 12M16 9a5 5 0 0 1 0 6M19 6a9 9 0 0 1 0 12"/>
                                     <circle cx="12" cy="12" r="2"/>
                                 </svg>
                             </span>
-                            <span class="min-w-0 flex-1 truncate text-sm text-slate-300 peer-checked:text-slate-100"
+                            <span class="min-w-0 flex-1 truncate text-sm text-slate-300 transition-colors peer-checked:font-medium peer-checked:text-slate-100"
                                   th:text="${channel.name}">MTV Hits</span>
-                            <span class="hidden text-emerald-400 peer-checked:block" aria-hidden="true">&#10003;</span>
+                            <span class="grid size-5 shrink-0 place-items-center rounded-full border border-slate-700 text-transparent transition peer-checked:border-emerald-400 peer-checked:bg-emerald-400 peer-checked:text-emerald-950"
+                                  aria-hidden="true">&#10003;</span>
                         </label>
                         <p id="no-channel-results" class="hidden px-3 py-8 text-center text-sm text-slate-500">
                             No channels match that search.
@@ -135,7 +147,9 @@
                 <div class="mt-6 space-y-2 border-t border-slate-800 pt-5">
                     <button type="submit"
                             class="w-full rounded-lg bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-emerald-950
-                                   transition hover:bg-emerald-300 focus:ring-2 focus:ring-emerald-300/60 focus:outline-none"
+                                   shadow-[0_8px_24px_rgba(52,211,153,0.12)] transition hover:-translate-y-0.5 hover:bg-emerald-300
+                                   hover:shadow-[0_10px_28px_rgba(52,211,153,0.2)] focus:ring-2 focus:ring-emerald-300/60 focus:outline-none
+                                   disabled:cursor-not-allowed disabled:opacity-50"
                             th:text="${editing} ? 'Save listener' : 'Add listener'">Add listener</button>
                     <a th:href="@{/playlists/{id}(id=${playlist.id})}"
                        class="block w-full rounded-lg px-4 py-2.5 text-center text-sm text-slate-400 transition hover:bg-slate-800 hover:text-slate-200">
@@ -151,9 +165,33 @@
             const search = document.getElementById('channel-search');
             const rows = [...document.querySelectorAll('[data-channel-row]')];
             const empty = document.getElementById('no-channel-results');
-            if (!search || rows.length === 0) return;
+            const clear = document.getElementById('clear-channel-search');
+            if (!search) return;
 
-            search.addEventListener('input', () => {
+            const syncSelection = () => {
+                rows.forEach(row => {
+                    const radio = row.querySelector('input[type="radio"]');
+                    row.classList.toggle('is-selected', Boolean(radio?.checked));
+                });
+            };
+
+            rows.forEach(row => {
+                const radio = row.querySelector('input[type="radio"]');
+                if (!radio) return;
+
+                // The native label behavior should select this radio; set it explicitly as
+                // well so the full visual row remains a reliable target on touch devices.
+                row.addEventListener('click', () => {
+                    if (!radio.checked) {
+                        radio.checked = true;
+                        radio.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                });
+                radio.addEventListener('change', syncSelection);
+            });
+            syncSelection();
+
+            const filterChannels = () => {
                 const query = search.value.trim().toLocaleLowerCase();
                 let visible = 0;
                 rows.forEach(row => {
@@ -161,7 +199,18 @@
                     row.classList.toggle('hidden', !matches);
                     if (matches) visible++;
                 });
-                empty.classList.toggle('hidden', visible !== 0);
+                if (empty) empty.classList.toggle('hidden', visible !== 0 || rows.length === 0);
+                if (clear) {
+                    clear.classList.toggle('hidden', query.length === 0);
+                    clear.classList.toggle('inline-flex', query.length > 0);
+                }
+            };
+
+            search.addEventListener('input', filterChannels);
+            clear?.addEventListener('click', () => {
+                search.value = '';
+                filterChannels();
+                search.focus();
             });
         })();
     </script>

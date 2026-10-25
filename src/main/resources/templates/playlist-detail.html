@@ -35,9 +35,10 @@
                 </p>
             </div>
             <a th:href="@{/playlists/{id}/listeners/new(id=${playlist.id})}"
-               class="inline-flex items-center gap-2 rounded-lg bg-emerald-400 px-4 py-2.5 text-sm font-semibold
-                      text-emerald-950 transition hover:bg-emerald-300 focus:ring-2 focus:ring-emerald-300/60 focus:outline-none">
-                <span class="text-lg leading-none" aria-hidden="true">+</span>
+               class="inline-flex min-h-11 items-center gap-2 rounded-lg bg-emerald-400 px-4 py-2.5 text-sm font-semibold
+                      text-emerald-950 shadow-[0_8px_24px_rgba(52,211,153,0.12)] transition hover:-translate-y-0.5 hover:bg-emerald-300
+                      hover:shadow-[0_10px_28px_rgba(52,211,153,0.2)] focus:ring-2 focus:ring-emerald-300/60 focus:outline-none">
+                <span class="grid size-5 place-items-center rounded-full bg-emerald-950/10 text-base leading-none" aria-hidden="true">+</span>
                 Add listener
             </a>
         </div>
@@ -68,6 +69,10 @@
                 </div>
                 <h3 class="mt-4 text-sm font-medium text-slate-200">No listeners configured</h3>
                 <p class="mt-1 text-sm text-slate-500">Choose a channel and decide how often SongRadar should listen.</p>
+                <a th:href="@{/playlists/{id}/listeners/new(id=${playlist.id})}"
+                   class="mt-5 inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-700/70 bg-emerald-950/50 px-4 py-2 text-sm font-medium text-emerald-200 transition hover:border-emerald-500 hover:bg-emerald-900/60 focus:ring-2 focus:ring-emerald-400/50 focus:outline-none">
+                    <span aria-hidden="true">+</span> Add your first listener
+                </a>
             </div>
 
             <div th:unless="${#lists.isEmpty(listeners)}" class="mt-4 grid gap-3 xl:grid-cols-2">

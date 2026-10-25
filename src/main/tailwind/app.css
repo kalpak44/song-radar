@@ -5,6 +5,32 @@
    used in them is stripped from the build. */
 @source "../resources/templates";
 
+/* Keep the channel picker native and keyboard-operable while matching the dark UI. */
+.channel-search {
+  color-scheme: dark;
+  appearance: none;
+}
+
+.channel-search::-webkit-search-cancel-button,
+.channel-search::-webkit-search-decoration {
+  appearance: none;
+}
+
+.channel-option:has(input:checked) {
+  border-color: rgb(6 95 70 / 0.8);
+  background: rgb(2 44 34 / 0.34);
+}
+
+.channel-option.is-selected {
+  border-color: rgb(6 95 70 / 0.8);
+  background: rgb(2 44 34 / 0.34);
+}
+
+.channel-option:focus-within {
+  outline: 2px solid rgb(52 211 153 / 0.55);
+  outline-offset: 1px;
+}
+
 /* The range input is an invisible interaction layer over the storage meter. Its
    thumb stays large enough for touch while the visible quota marker is rendered
    separately, keeping the disk segments readable. */
