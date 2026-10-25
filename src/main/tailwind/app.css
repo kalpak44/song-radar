@@ -68,6 +68,12 @@
   padding-block: 2.25rem;
 }
 
+.recording-player {
+  min-height: 2.75rem;
+  accent-color: rgb(52 211 153);
+  color-scheme: dark;
+}
+
 .channel-option:focus-within {
   outline: 2px solid rgb(52 211 153 / 0.55);
   outline-offset: 1px;

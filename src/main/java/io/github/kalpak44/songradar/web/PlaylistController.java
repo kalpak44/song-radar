@@ -1,8 +1,11 @@
 package io.github.kalpak44.songradar.web;
 
+import io.github.kalpak44.songradar.listener.ListenerRecording;
+import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
 import io.github.kalpak44.songradar.listener.ListenerScheduler;
 import io.github.kalpak44.songradar.listener.ListenerService;
 import io.github.kalpak44.songradar.listener.PlaylistListener;
+import io.github.kalpak44.songradar.listener.RecordingStatus;
 import io.github.kalpak44.songradar.playlist.PlaylistChannel;
 import io.github.kalpak44.songradar.playlist.PlaylistChannelService;
 import io.github.kalpak44.songradar.playlist.PlaylistSource;
@@ -10,9 +13,18 @@ import io.github.kalpak44.songradar.playlist.PlaylistSourceService;
 import io.github.kalpak44.songradar.playlist.PlaylistUnavailableException;
 import io.github.kalpak44.songradar.web.form.ListenerForm;
 import jakarta.validation.Valid;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.time.ZoneId;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -32,19 +44,25 @@ public class PlaylistController {
   private final PlaylistSourceService playlists;
   private final PlaylistChannelService channels;
   private final ListenerService listeners;
+  private final ListenerRecordingRepository recordings;
   private final ListenerScheduler scheduler;
+  private final Path recordingsRoot;
   private final ZoneId zone;
 
   public PlaylistController(
       PlaylistSourceService playlists,
       PlaylistChannelService channels,
       ListenerService listeners,
+      ListenerRecordingRepository recordings,
       ListenerScheduler scheduler,
+      @Value("${songradar.storage.recordings}") Path recordingsRoot,
       Clock clock) {
     this.playlists = playlists;
     this.channels = channels;
     this.listeners = listeners;
+    this.recordings = recordings;
     this.scheduler = scheduler;
+    this.recordingsRoot = recordingsRoot.toAbsolutePath().normalize();
     this.zone = clock.getZone();
   }
 
@@ -67,6 +85,27 @@ public class PlaylistController {
       @PathVariable long playlistId, @PathVariable long listenerId, Model model) {
     PlaylistListener listener = requireListener(playlistId, listenerId);
     return renderEditor(requirePlaylist(playlistId), listener, ListenerForm.from(listener), model);
+  }
+
+  @GetMapping("/playlists/{playlistId}/listeners/{listenerId}/recordings/{recordingId}/audio")
+  public ResponseEntity<Resource> recordingAudio(
+      @PathVariable long playlistId,
+      @PathVariable long listenerId,
+      @PathVariable long recordingId) {
+    PlaylistListener listener = requireListener(playlistId, listenerId);
+    ListenerRecording recording =
+        recordings
+            .findById(recordingId)
+            .filter(
+                item ->
+                    item.listenerId().equals(listener.id())
+                        && item.status() == RecordingStatus.COMPLETED
+                        && item.filePath() != null)
+            .orElseThrow(this::notFound);
+    Resource resource = resolveRecording(recording.filePath());
+    MediaType contentType =
+        MediaTypeFactory.getMediaType(resource).orElse(MediaType.parseMediaType("audio/mpeg"));
+    return ResponseEntity.ok().contentType(contentType).body(resource);
   }
 
   @PostMapping("/playlists/{playlistId}/listeners")
@@ -172,6 +211,12 @@ public class PlaylistController {
     model.addAttribute("playlist", playlist);
     model.addAttribute("editing", listener != null);
     model.addAttribute("listenerId", listener == null ? null : listener.id());
+    if (listener != null) {
+      model.addAttribute(
+          "recordings",
+          RecordingView.of(
+              recordings.findAllByListenerIdOrderByStartedAtDesc(listener.id()), zone));
+    }
     if (!model.containsAttribute(LISTENER_FORM)) {
       model.addAttribute(LISTENER_FORM, form);
     }
@@ -194,6 +239,23 @@ public class PlaylistController {
     return listeners
         .find(playlistId, listenerId)
         .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+  }
+
+  private Resource resolveRecording(String filePath) {
+    try {
+      Path root = recordingsRoot.toRealPath();
+      Path file = recordingsRoot.resolve(filePath).normalize().toRealPath();
+      if (!file.startsWith(root) || !Files.isRegularFile(file) || !Files.isReadable(file)) {
+        throw notFound();
+      }
+      return new FileSystemResource(file);
+    } catch (IOException e) {
+      throw notFound();
+    }
+  }
+
+  private ResponseStatusException notFound() {
+    return new ResponseStatusException(HttpStatus.NOT_FOUND);
   }
 
   private static String redirectToPlaylist(long playlistId) {

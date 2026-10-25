@@ -14,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
 import io.github.kalpak44.songradar.listener.ListenerScheduler;
 import io.github.kalpak44.songradar.listener.ListenerService;
 import io.github.kalpak44.songradar.listener.ListenerStatus;
@@ -51,6 +52,7 @@ class PlaylistControllerTest {
   @MockitoBean private PlaylistSourceService playlists;
   @MockitoBean private PlaylistChannelService channels;
   @MockitoBean private ListenerService listeners;
+  @MockitoBean private ListenerRecordingRepository recordings;
   @MockitoBean private ListenerScheduler scheduler;
 
   @BeforeEach

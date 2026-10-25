@@ -84,5 +84,26 @@
         </footer>
     </div>
 </div>
+<script>
+    (() => {
+        const formatters = {
+            compact: new Intl.DateTimeFormat(undefined, {
+                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+            }),
+            detailed: new Intl.DateTimeFormat(undefined, {
+                month: 'short', day: 'numeric', year: 'numeric',
+                hour: 'numeric', minute: '2-digit', second: '2-digit'
+            })
+        };
+
+        document.querySelectorAll('time[data-local-time]').forEach(element => {
+            const instant = new Date(element.dateTime);
+            if (Number.isNaN(instant.getTime())) return;
+            const format = element.dataset.localTime === 'detailed' ? 'detailed' : 'compact';
+            element.textContent = formatters[format].format(instant);
+            element.title = instant.toLocaleString();
+        });
+    })();
+</script>
 </body>
 </html>

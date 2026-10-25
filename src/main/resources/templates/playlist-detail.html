@@ -110,11 +110,23 @@
                         </div>
                         <div>
                             <p class="text-slate-600">Last recording</p>
-                            <p class="mt-1 text-slate-300" th:text="${listener.lastRecording}">Never</p>
+                            <p class="mt-1 text-slate-300">
+                                <time th:if="${listener.lastRecordingAt != null}" data-local-time="compact"
+                                      th:attr="datetime=${listener.lastRecordingAt}"
+                                      th:text="${listener.lastRecording}">Oct 25, 07:51</time>
+                                <span th:unless="${listener.lastRecordingAt != null}"
+                                      th:text="${listener.lastRecording}">Never recorded</span>
+                            </p>
                         </div>
                         <div>
                             <p class="text-slate-600">Next recording</p>
-                            <p class="mt-1 text-slate-300" th:text="${listener.nextRecording}">Oct 24, 22:55</p>
+                            <p class="mt-1 text-slate-300">
+                                <time th:if="${listener.active and listener.nextRecordingAt != null}" data-local-time="compact"
+                                      th:attr="datetime=${listener.nextRecordingAt}"
+                                      th:text="${listener.nextRecording}">Oct 25, 07:54</time>
+                                <span th:unless="${listener.active and listener.nextRecordingAt != null}"
+                                      th:text="${listener.nextRecording}">Scheduling</span>
+                            </p>
                         </div>
                     </div>
 
@@ -151,7 +163,7 @@
                 </article>
             </div>
         </section>
-    </div>
+</div>
 </main>
 </body>
 </html>

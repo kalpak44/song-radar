@@ -17,7 +17,9 @@ public record ListenerView(
     String statusLabel,
     boolean active,
     String lastRecording,
-    String nextRecording) {
+    String nextRecording,
+    Instant lastRecordingAt,
+    Instant nextRecordingAt) {
 
   private static final DateTimeFormatter TIME =
       DateTimeFormatter.ofPattern("MMM d, HH:mm", Locale.ENGLISH);
@@ -33,7 +35,9 @@ public record ListenerView(
         active ? "Active" : "Paused",
         active,
         format(listener.lastRecordingAt(), zone, "Never recorded"),
-        active ? format(listener.nextRecordingAt(), zone, "Scheduling") : "Paused");
+        active ? format(listener.nextRecordingAt(), zone, "Scheduling") : "Paused",
+        listener.lastRecordingAt(),
+        active ? listener.nextRecordingAt() : null);
   }
 
   public static List<ListenerView> of(List<PlaylistListener> listeners, ZoneId zone) {
