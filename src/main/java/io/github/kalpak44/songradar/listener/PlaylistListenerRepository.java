@@ -20,9 +20,12 @@ public interface PlaylistListenerRepository extends ListCrudRepository<PlaylistL
   @Query(
       """
       update playlist_listeners
-      set last_recording_at = :lastRecordingAt,
-          next_recording_at = case when status = 'ACTIVE' then :nextRecordingAt else null end,
-          updated_at = :updatedAt
+      set last_recording_at = cast(:lastRecordingAt as timestamptz),
+          next_recording_at = case
+              when status = 'ACTIVE' then cast(:nextRecordingAt as timestamptz)
+              else null
+          end,
+          updated_at = cast(:updatedAt as timestamptz)
       where id = :id
       """)
   int updateAfterRecording(
