@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
@@ -39,11 +40,13 @@ public class SourcedMusicDownloader implements MusicDownloader {
   private final List<TrackSource> sources;
   private final ActivityLog activity;
 
+  @Autowired
   public SourcedMusicDownloader(List<TrackSource> sources, ActivityLog activity) {
     this.sources = List.copyOf(sources);
     this.activity = activity;
   }
 
+  /** For tests that are not about the activity feed. */
   public SourcedMusicDownloader(List<TrackSource> sources) {
     this(sources, ActivityLog.NONE);
   }
