@@ -239,8 +239,8 @@ public class SoundDetectionService {
             now,
             pending.detectionCount(),
             null);
-    SoundDetection matched = detections.save(candidate);
-    queueDownloadPlan(matched == null ? candidate : matched);
+    detections.save(candidate);
+    queueDownloadPlan(candidate);
   }
 
   private void queueDownloadPlan(SoundDetection detection) {
