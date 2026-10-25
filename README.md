@@ -4,8 +4,8 @@ Self-hosted music discovery from IPTV and radio streams. Automatically identify 
 audio, and manage your personal music library.
 
 > **Status: early development.** Playlist sources, scheduled channel listeners, storage settings,
-> recordings, and sound detections are available; music library management and authentication are
-> still to come.
+> recordings, sound detections, track downloads and an activity feed are available; music library
+> management and authentication are still to come.
 
 Java 25 · Spring Boot 4.1 (Web MVC, Thymeleaf, Data JDBC) · PostgreSQL · Tailwind CSS 4
 

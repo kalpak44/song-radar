@@ -3,6 +3,8 @@ package io.github.kalpak44.songradar.library;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.sciss.jump3r.lowlevel.LameEncoder;
+import io.github.kalpak44.songradar.activity.ActivityKind;
+import io.github.kalpak44.songradar.activity.ActivityLog;
 import io.github.kalpak44.songradar.detection.DetectionStatus;
 import io.github.kalpak44.songradar.detection.SoundDetection;
 import java.io.ByteArrayOutputStream;
@@ -236,6 +238,34 @@ class SourcedMusicDownloaderTest {
         .download(detection("AC/DC", "Back in Black"), library);
 
     assertThat(library.resolve("AC DC - Back in Black.mp3")).exists();
+  }
+
+  /** The activity feed is how a download that went nowhere is explained afterwards. */
+  @Test
+  void reportsEverySourceItTriedAndWhereTheTrackCameFrom() {
+    List<String> feed = new ArrayList<>();
+    ActivityLog log =
+        (kind, listener, track, source, message) ->
+            feed.add(kind + " " + source + " " + listener + " | " + track);
+
+    new SourcedMusicDownloader(List.of(finding("empty", false), serving("second", track)), log)
+        .download(detection("Daft Punk", "Get Lucky"), library.resolve("Radio One"));
+
+    assertThat(feed)
+        .containsExactly(
+            "SEARCHING empty Radio One | Daft Punk - Get Lucky",
+            "SAVED second Radio One | Daft Punk - Get Lucky");
+  }
+
+  @Test
+  void reportsThatNoSourceCouldDeliverTheTrack() {
+    List<ActivityKind> kinds = new ArrayList<>();
+    ActivityLog log = (kind, listener, trackName, source, message) -> kinds.add(kind);
+
+    new SourcedMusicDownloader(List.of(finding("empty", false)), log)
+        .download(detection("Daft Punk", "Get Lucky"), library);
+
+    assertThat(kinds).containsExactly(ActivityKind.SEARCHING, ActivityKind.UNAVAILABLE);
   }
 
   private List<String> contents() throws IOException {

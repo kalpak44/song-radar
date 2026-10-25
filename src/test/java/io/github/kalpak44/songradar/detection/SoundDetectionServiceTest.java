@@ -60,7 +60,8 @@ class SoundDetectionServiceTest {
             downloader,
             recognition,
             executor,
-            Clock.fixed(NOW, ZoneOffset.UTC));
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            io.github.kalpak44.songradar.activity.ActivityLog.NONE);
   }
 
   @Test

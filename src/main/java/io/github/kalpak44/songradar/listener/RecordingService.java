@@ -1,5 +1,7 @@
 package io.github.kalpak44.songradar.listener;
 
+import io.github.kalpak44.songradar.activity.ActivityKind;
+import io.github.kalpak44.songradar.activity.ActivityLog;
 import io.github.kalpak44.songradar.detection.SoundDetectionService;
 import io.github.kalpak44.songradar.storage.StorageService;
 import java.io.IOException;
@@ -28,6 +30,7 @@ public class RecordingService {
   private final StorageService storage;
   private final Clock clock;
   private final SoundDetectionService soundDetections;
+  private final ActivityLog activity;
 
   @Autowired
   public RecordingService(
@@ -36,7 +39,9 @@ public class RecordingService {
       ListenerRecordingRepository recordings,
       StorageService storage,
       Clock clock,
-      SoundDetectionService soundDetections) {
+      SoundDetectionService soundDetections,
+      ActivityLog activity) {
+    this.activity = activity;
     this.root = root.toAbsolutePath().normalize();
     this.client = client;
     this.recordings = recordings;
@@ -51,7 +56,7 @@ public class RecordingService {
       ListenerRecordingRepository recordings,
       StorageService storage,
       Clock clock) {
-    this(root, client, recordings, storage, clock, null);
+    this(root, client, recordings, storage, clock, null, ActivityLog.NONE);
   }
 
   public RecordingAttempt record(PlaylistListener listener) {
@@ -76,6 +81,12 @@ public class RecordingService {
                   completed,
                   Files.size(capture.path()),
                   capture.durationMillis()));
+      activity.record(
+          ActivityKind.RECORDED,
+          listener.name(),
+          null,
+          listener.channelName(),
+          "Captured " + (capture.durationMillis() / 1000) + "s from the stream");
       if (soundDetections != null) {
         try {
           soundDetections.enqueue(saved);
@@ -93,6 +104,12 @@ public class RecordingService {
       Instant completed = clock.instant();
       recordings.save(
           ListenerRecording.failed(listener.id(), started, completed, conciseMessage(e)));
+      activity.record(
+          ActivityKind.UNAVAILABLE,
+          listener.name(),
+          null,
+          listener.channelName(),
+          "Could not record the stream: " + conciseMessage(e));
       return new RecordingAttempt(started, false);
     }
   }

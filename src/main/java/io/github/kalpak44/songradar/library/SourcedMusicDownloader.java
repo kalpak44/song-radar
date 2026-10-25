@@ -2,6 +2,8 @@ package io.github.kalpak44.songradar.library;
 
 import com.mpatric.mp3agic.ID3v24Tag;
 import com.mpatric.mp3agic.Mp3File;
+import io.github.kalpak44.songradar.activity.ActivityKind;
+import io.github.kalpak44.songradar.activity.ActivityLog;
 import io.github.kalpak44.songradar.detection.SoundDetection;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -35,9 +37,15 @@ public class SourcedMusicDownloader implements MusicDownloader {
   private static final int SHORTEST_TRACK_SECONDS = 30;
 
   private final List<TrackSource> sources;
+  private final ActivityLog activity;
+
+  public SourcedMusicDownloader(List<TrackSource> sources, ActivityLog activity) {
+    this.sources = List.copyOf(sources);
+    this.activity = activity;
+  }
 
   public SourcedMusicDownloader(List<TrackSource> sources) {
-    this.sources = List.copyOf(sources);
+    this(sources, ActivityLog.NONE);
   }
 
   @Override
@@ -49,15 +57,27 @@ public class SourcedMusicDownloader implements MusicDownloader {
       return;
     }
     Path target = destinationFolder.resolve(fileName(detection, artist, title)).normalize();
+    // The folder is named for the listener that recorded the track, which is the only place
+    // the name is available here and the only place the feed needs it.
+    String listener = String.valueOf(destinationFolder.getFileName());
+    String track = artist.isBlank() ? title : artist + " - " + title;
 
     for (TrackSource source : sources) {
       Optional<SourceTrack> found = source.find(artist, title);
       if (found.isEmpty()) {
+        activity.record(
+            ActivityKind.SEARCHING, listener, track, source.name(), "No match in this catalogue");
         continue;
       }
       try {
         store(found.get(), target, artist, title);
         log.info("Saved \"{} - {}\" from {} to {}", artist, title, found.get().source(), target);
+        activity.record(
+            ActivityKind.SAVED,
+            listener,
+            track,
+            found.get().source(),
+            "Saved as " + target.getFileName());
         return;
       } catch (IOException | RuntimeException exception) {
         log.info(
@@ -66,9 +86,17 @@ public class SourcedMusicDownloader implements MusicDownloader {
             artist,
             title,
             exception.toString());
+        activity.record(
+            ActivityKind.SEARCHING,
+            listener,
+            track,
+            source.name(),
+            "Matched but could not deliver it: " + reason(exception));
       }
     }
     log.info("No source had \"{} - {}\"", artist, title);
+    activity.record(
+        ActivityKind.UNAVAILABLE, listener, track, null, "No source could deliver this track");
   }
 
   /**
@@ -129,6 +157,13 @@ public class SourcedMusicDownloader implements MusicDownloader {
     } catch (Exception exception) {
       log.info("Could not tag {}: {}", file.getFileName(), exception.toString());
     }
+  }
+
+  /** The exception text alone, since the feed has no room for a stack trace. */
+  private static String reason(Exception exception) {
+    return exception.getMessage() == null
+        ? exception.getClass().getSimpleName()
+        : exception.getMessage();
   }
 
   private static String fileName(SoundDetection detection, String artist, String title) {

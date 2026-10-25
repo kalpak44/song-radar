@@ -1,5 +1,7 @@
 package io.github.kalpak44.songradar.detection;
 
+import io.github.kalpak44.songradar.activity.ActivityKind;
+import io.github.kalpak44.songradar.activity.ActivityLog;
 import io.github.kalpak44.songradar.library.MusicDownloader;
 import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
@@ -35,6 +37,7 @@ public class SoundDetectionService {
   private final PlaylistListenerRepository listeners;
   private final MusicDownloader downloader;
   private final AuddRecognitionClient recognition;
+  private final ActivityLog activity;
   private final TaskExecutor executor;
   private final Clock clock;
 
@@ -47,7 +50,9 @@ public class SoundDetectionService {
       MusicDownloader downloader,
       AuddRecognitionClient recognition,
       @Qualifier("recognitionTaskExecutor") TaskExecutor executor,
-      Clock clock) {
+      Clock clock,
+      ActivityLog activity) {
+    this.activity = activity;
     this.root = root.toAbsolutePath().normalize();
     this.libraryRoot = libraryRoot.toAbsolutePath().normalize();
     this.detections = detections;
@@ -177,6 +182,12 @@ public class SoundDetectionService {
       String artist = result.get("artist");
       if (blank(title) || blank(artist)) {
         update(detection, DetectionStatus.NO_MATCH, null, null, null, null, null, null, 1, null);
+        activity.record(
+            ActivityKind.NOT_IDENTIFIED,
+            listenerNameFor(detection),
+            null,
+            PROVIDER,
+            "No track recognised in this recording");
       } else {
         saveMatched(detection, result);
       }
@@ -253,12 +264,39 @@ public class SoundDetectionService {
         .filter(java.util.Objects::nonNull)
         .flatMap(listeners::findById)
         .ifPresentOrElse(
-            listener ->
-                downloader.download(detection, libraryRoot.resolve(safeFolderName(listener))),
+            listener -> {
+              activity.record(
+                  ActivityKind.DETECTED,
+                  listener.name(),
+                  trackOf(detection),
+                  PROVIDER,
+                  "Identified from a recording");
+              downloader.download(detection, libraryRoot.resolve(safeFolderName(listener)));
+            },
             () ->
                 log.info(
-                    "Dummy downloader skipped detection {} because its listener is no longer available",
+                    "Skipped the download for detection {}: its listener is no longer available",
                     detection.id()));
+  }
+
+  /** Null when the recording or its listener has since been removed. */
+  private String listenerNameFor(SoundDetection detection) {
+    if (detection.recordingId() == null) {
+      return null;
+    }
+    return recordings
+        .findById(detection.recordingId())
+        .map(ListenerRecording::listenerId)
+        .filter(java.util.Objects::nonNull)
+        .flatMap(listeners::findById)
+        .map(PlaylistListener::name)
+        .orElse(null);
+  }
+
+  private static String trackOf(SoundDetection detection) {
+    String artist = detection.artist() == null ? "" : detection.artist();
+    String title = detection.title() == null ? "" : detection.title();
+    return artist.isBlank() ? title : artist + " - " + title;
   }
 
   private static String safeFolderName(PlaylistListener listener) {
