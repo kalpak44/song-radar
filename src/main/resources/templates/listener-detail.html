@@ -65,7 +65,7 @@
                     <div id="channel-list" class="mt-3 max-h-80 space-y-1 overflow-y-auto rounded-xl border border-slate-800 bg-black/20 p-1.5"
                          role="radiogroup" aria-label="Choose a playlist channel">
                         <label th:each="channel : ${channels}" data-channel-row
-                               th:attr="data-search=${#strings.toLowerCase(channel.name)}"
+                               th:attr="data-search=${#strings.toLowerCase(channel.name)},data-channel-name=${channel.name}"
                                class="channel-option group relative flex cursor-pointer items-center gap-3 rounded-lg border border-transparent px-3 py-3 transition">
                             <input type="radio" th:field="*{channelUrl}" th:value="${channel.streamUrl}"
                                    class="channel-radio size-4 shrink-0 accent-emerald-400">
@@ -131,6 +131,7 @@
                        class="mt-1.5 w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm
                               text-slate-100 placeholder:text-slate-600 focus:border-emerald-600
                               focus:ring-1 focus:ring-emerald-600 focus:outline-none">
+                <p class="mt-1.5 text-xs text-slate-500">Suggested from the selected channel. You can change it.</p>
                 <p th:if="${#fields.hasErrors('name')}" th:errors="*{name}" class="mt-1.5 text-xs text-red-300">Name error</p>
 
                 <label class="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-800 bg-black/20 p-3.5">
@@ -164,7 +165,35 @@
             const rows = [...document.querySelectorAll('[data-channel-row]')];
             const empty = document.getElementById('no-channel-results');
             const clear = document.getElementById('clear-channel-search');
+            const name = document.getElementById('name');
             if (!search) return;
+
+            let generatedName = '';
+            const selectedRow = () => rows.find(row => row.querySelector('input[type="radio"]')?.checked);
+            const suggestionFor = row => `${row.dataset.channelName.trim()} Listener`;
+
+            if (name) {
+                const currentChannel = selectedRow();
+                generatedName = currentChannel ? suggestionFor(currentChannel) : '';
+                let customName = Boolean(name.value.trim() && name.value.trim() !== generatedName);
+
+                const updateNameFromChannel = () => {
+                    const row = selectedRow();
+                    if (!row || customName) return;
+                    generatedName = suggestionFor(row);
+                    name.value = generatedName;
+                };
+
+                name.addEventListener('input', () => {
+                    const value = name.value.trim();
+                    customName = Boolean(value && value !== generatedName);
+                });
+
+                rows.forEach(row => {
+                    row.querySelector('input[type="radio"]')?.addEventListener('change', updateNameFromChannel);
+                });
+                updateNameFromChannel();
+            }
 
             const syncSelection = () => {
                 rows.forEach(row => {
