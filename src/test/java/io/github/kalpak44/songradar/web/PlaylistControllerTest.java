@@ -94,7 +94,63 @@ class PlaylistControllerTest {
         .andExpect(status().isOk())
         .andExpect(view().name("listener-detail"))
         .andExpect(content().string(containsString("Search channels by name")))
+        .andExpect(content().string(containsString("type=\"checkbox\"")))
+        .andExpect(content().string(containsString("type=\"time\"")))
+        .andExpect(content().string(containsString("Add time window")))
         .andExpect(content().string(containsString("MTV Hits")));
+  }
+
+  @Test
+  void scheduledListenerAcceptsOvernightTimeWindow() throws Exception {
+    PlaylistListener saved = listener(ListenerStatus.ACTIVE);
+    when(channels.requireChannel(4L, CHANNEL.streamUrl())).thenReturn(CHANNEL);
+    when(listeners.create(4L, "MTV Listener", CHANNEL, 3, 12, "22:00-02:00", true))
+        .thenReturn(saved);
+
+    mockMvc
+        .perform(
+            post("/playlists/4/listeners")
+                .param("name", "MTV Listener")
+                .param("channelUrl", CHANNEL.streamUrl())
+                .param("intervalMinutes", "3")
+                .param("durationSeconds", "12")
+                .param("scheduled", "true")
+                .param("windowStart[0]", "22:00")
+                .param("windowEnd[0]", "02:00")
+                .param("active", "true"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/playlists/4"));
+
+    verify(listeners).create(4L, "MTV Listener", CHANNEL, 3, 12, "22:00-02:00", true);
+  }
+
+  @Test
+  void enabledTimeWindowScheduleRequiresAtLeastOneCompleteWindow() throws Exception {
+    when(channels.channels(4L)).thenReturn(List.of(CHANNEL));
+    when(channels.requireChannel(4L, CHANNEL.streamUrl())).thenReturn(CHANNEL);
+
+    mockMvc
+        .perform(
+            post("/playlists/4/listeners")
+                .param("name", "MTV Listener")
+                .param("channelUrl", CHANNEL.streamUrl())
+                .param("intervalMinutes", "3")
+                .param("durationSeconds", "12")
+                .param("scheduled", "true")
+                .param("active", "true"))
+        .andExpect(status().isOk())
+        .andExpect(view().name("listener-detail"))
+        .andExpect(content().string(containsString("Add at least one listening window")));
+
+    verify(listeners, never())
+        .create(
+            any(Long.class),
+            any(),
+            any(),
+            any(Integer.class),
+            any(Integer.class),
+            any(),
+            any(Boolean.class));
   }
 
   @Test

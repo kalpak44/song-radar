@@ -75,6 +75,45 @@ public class FileExplorerService {
     }
   }
 
+  /** All playable files below a directory, without following symbolic links. */
+  public List<LibraryFile> listPlayableRecursively(String relativeDirectory) throws IOException {
+    Path directory = fileOrDirectory(relativeDirectory);
+    try (var paths = Files.walk(directory)) {
+      return paths
+          .filter(path -> !path.equals(directory))
+          .filter(path -> !Files.isSymbolicLink(path))
+          .filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
+          .filter(path -> !path.getFileName().toString().startsWith(".songradar-download-"))
+          .map(
+              path ->
+                  new LibraryFile(
+                      path.getFileName().toString(),
+                      relative(path),
+                      false,
+                      size(path),
+                      modified(path)))
+          .filter(LibraryFile::playable)
+          .sorted(Comparator.comparing(LibraryFile::relativePath, String.CASE_INSENSITIVE_ORDER))
+          .toList();
+    }
+  }
+
+  private static long size(Path path) {
+    try {
+      return Files.size(path);
+    } catch (IOException exception) {
+      return 0;
+    }
+  }
+
+  private static java.time.Instant modified(Path path) {
+    try {
+      return Files.getLastModifiedTime(path, LinkOption.NOFOLLOW_LINKS).toInstant();
+    } catch (IOException exception) {
+      return java.time.Instant.EPOCH;
+    }
+  }
+
   public void createFolder(String parent, String name) throws IOException {
     Path folder = child(resolve(parent), name);
     Files.createDirectory(folder);

@@ -135,6 +135,27 @@ class SourcedMusicDownloaderTest {
   }
 
   @Test
+  void usesTheNextSourceWhenTheFirstFailsWhileSearching() {
+    TrackSource unavailable =
+        new TrackSource() {
+          @Override
+          public String name() {
+            return "unavailable";
+          }
+
+          @Override
+          public Optional<SourceTrack> find(String artist, String title) {
+            throw new IllegalStateException("catalogue is temporarily unavailable");
+          }
+        };
+
+    new SourcedMusicDownloader(List.of(unavailable, serving("second", track)))
+        .download(detection("Daft Punk", "Get Lucky"), library);
+
+    assertThat(library.resolve("Daft Punk - Get Lucky.mp3")).exists();
+  }
+
+  @Test
   void overwritesATrackThatIsAlreadyThere() throws IOException {
     Path target = library.resolve("Daft Punk - Get Lucky.mp3");
     Files.writeString(target, "stale");

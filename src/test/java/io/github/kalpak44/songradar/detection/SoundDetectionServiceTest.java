@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.github.kalpak44.songradar.activity.ActivityEventRepository;
 import io.github.kalpak44.songradar.library.MusicDownloader;
 import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
@@ -35,6 +36,7 @@ class SoundDetectionServiceTest {
   @TempDir Path root;
 
   private SoundDetectionRepository detections;
+  private ActivityEventRepository activityEvents;
   private ListenerRecordingRepository recordings;
   private PlaylistListenerRepository listeners;
   private MusicDownloader downloader;
@@ -45,6 +47,7 @@ class SoundDetectionServiceTest {
   @BeforeEach
   void setUp() {
     detections = mock(SoundDetectionRepository.class);
+    activityEvents = mock(ActivityEventRepository.class);
     recordings = mock(ListenerRecordingRepository.class);
     listeners = mock(PlaylistListenerRepository.class);
     downloader = mock(MusicDownloader.class);
@@ -55,6 +58,7 @@ class SoundDetectionServiceTest {
             root,
             root.resolve("library"),
             detections,
+            activityEvents,
             recordings,
             listeners,
             downloader,
@@ -105,6 +109,34 @@ class SoundDetectionServiceTest {
     assertThat(service.clear()).isEqualTo(31);
 
     verify(detections).deleteAll();
+  }
+
+  @Test
+  void downloadUsesPersistedListenerWhenSourceRecordingHasExpired() {
+    SoundDetection detection =
+        new SoundDetection(
+            41L,
+            99L,
+            DetectionStatus.MATCHED,
+            "AudD",
+            "artist|song",
+            "Song",
+            "Artist",
+            null,
+            null,
+            null,
+            NOW,
+            NOW,
+            1,
+            null,
+            "Radio One Listener");
+    when(detections.findById(41L)).thenReturn(Optional.of(detection));
+    when(recordings.findById(99L)).thenReturn(Optional.empty());
+
+    assertThat(service.planDownload(41L))
+        .isEqualTo(SoundDetectionService.DownloadPlanResult.PLANNED);
+
+    verify(downloader).download(detection, root.resolve("library/Radio One Listener"));
   }
 
   /** The recording existed to be identified; once it has been, it only costs volume space. */

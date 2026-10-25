@@ -168,7 +168,7 @@ public class PlaylistController {
             channel,
             form.getIntervalMinutes(),
             form.getDurationSeconds(),
-            form.getListenWindows(),
+            form.toStoredWindows(),
             form.isActive());
     scheduler.refresh(saved);
     redirect.addFlashAttribute(SUCCESS_MESSAGE, "Listener added.");
@@ -197,7 +197,7 @@ public class PlaylistController {
             channel,
             form.getIntervalMinutes(),
             form.getDurationSeconds(),
-            form.getListenWindows(),
+            form.toStoredWindows(),
             form.isActive());
     scheduler.refresh(saved);
     redirect.addFlashAttribute(SUCCESS_MESSAGE, "Listener updated.");
@@ -237,10 +237,17 @@ public class PlaylistController {
    * read.
    */
   private void validateWindows(ListenerForm form, BindingResult binding) {
+    if (form.isScheduled() && form.toStoredWindows().isBlank()) {
+      binding.rejectValue(
+          "windowStart",
+          "invalid",
+          "Add at least one listening window or switch the schedule off.");
+      return;
+    }
     try {
-      io.github.kalpak44.songradar.listener.ListenWindows.parse(form.getListenWindows());
+      io.github.kalpak44.songradar.listener.ListenWindows.parse(form.toStoredWindows());
     } catch (IllegalArgumentException exception) {
-      binding.rejectValue("listenWindows", "invalid", exception.getMessage());
+      binding.rejectValue("windowStart", "invalid", exception.getMessage());
     }
   }
 
@@ -269,6 +276,10 @@ public class PlaylistController {
     model.addAttribute("listenerTimezone", listeningSchedule.zone().getId());
     model.addAttribute("editing", listener != null);
     model.addAttribute("listenerId", listener == null ? null : listener.id());
+    if (form.getWindowStart().isEmpty() && form.getWindowEnd().isEmpty()) {
+      form.getWindowStart().add("");
+      form.getWindowEnd().add("");
+    }
     if (!model.containsAttribute(LISTENER_FORM)) {
       model.addAttribute(LISTENER_FORM, form);
     }

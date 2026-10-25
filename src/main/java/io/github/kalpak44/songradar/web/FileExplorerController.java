@@ -60,7 +60,12 @@ public class FileExplorerController {
       breadcrumbs.add(new Breadcrumb(accumulated.toString(), part));
     }
     model.addAttribute("activeNav", libraryScope ? "library" : "dashboard");
-    model.addAttribute("files", files.list(relative));
+    List<io.github.kalpak44.songradar.storage.LibraryFile> listing = files.list(relative);
+    model.addAttribute("files", listing);
+    List<io.github.kalpak44.songradar.storage.LibraryFile> playableTracks =
+        libraryScope ? files.listPlayableRecursively("library") : List.of();
+    model.addAttribute("playableTracks", playableTracks);
+    model.addAttribute("playableCount", playableTracks.size());
     model.addAttribute("currentPath", displayPath);
     model.addAttribute("scope", libraryScope ? "library" : "all");
     model.addAttribute("breadcrumbs", breadcrumbs);

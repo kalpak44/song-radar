@@ -92,10 +92,6 @@ public class SoundDetectionController {
       case NOT_FOUND -> redirect.addFlashAttribute("errorMessage", "Detection not found.");
       case NOT_IDENTIFIED ->
           redirect.addFlashAttribute("errorMessage", "Only identified tracks can be downloaded.");
-      case RECORDING_EXPIRED ->
-          redirect.addFlashAttribute(
-              "errorMessage",
-              "The source recording has expired, so its listener library folder is unavailable.");
     }
     return "redirect:/detections";
   }

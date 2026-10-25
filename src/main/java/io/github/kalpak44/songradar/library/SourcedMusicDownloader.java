@@ -80,7 +80,19 @@ public class SourcedMusicDownloader implements MusicDownloader {
     String track = artist.isBlank() ? title : artist + " - " + title;
 
     for (TrackSource source : sources) {
-      Optional<SourceTrack> found = source.find(artist, title);
+      Optional<SourceTrack> found;
+      try {
+        found = source.find(artist, title);
+      } catch (RuntimeException exception) {
+        log.info("{} search failed for {}: {}", source.name(), track, exception.toString());
+        activity.record(
+            ActivityKind.SEARCHING,
+            listener,
+            track,
+            source.name(),
+            "Search failed: " + reason(exception));
+        continue;
+      }
       if (found.isEmpty()) {
         activity.record(
             ActivityKind.SEARCHING, listener, track, source.name(), "No match in this catalogue");

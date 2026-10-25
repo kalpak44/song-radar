@@ -2,7 +2,7 @@
 <html lang="en" th:replace="~{layout :: page(${scope == 'library' ? 'Music library' : 'Your files'}, ~{:: #content})}"
       xmlns:th="http://www.thymeleaf.org">
 <body>
-<main id="content" class="min-w-0 flex-1 px-4 py-5 sm:px-7 sm:py-7">
+<main id="content" th:attr="data-scope=${scope}" class="min-w-0 flex-1 px-4 py-5 sm:px-7 sm:py-7">
     <div class="mx-auto max-w-6xl">
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -13,6 +13,21 @@
             <p class="max-w-full truncate rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2 font-mono text-xs text-slate-400"
                th:text="${storageRoot}">./data</p>
         </div>
+
+        <section th:if="${scope == 'library' and playableCount > 0}" class="mt-5 flex flex-wrap items-center gap-4 rounded-xl border border-emerald-900/50 bg-emerald-950/20 px-4 py-3">
+            <button id="play-all" type="button" class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300">
+                <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.5-.86l11 6.5a1 1 0 0 1 0 1.72l-11 6.5A1 1 0 0 1 7 17.5z"/></svg>
+                Play all
+            </button>
+            <span class="text-sm text-slate-300">Play every saved track in the library in order</span>
+            <span class="ml-auto font-mono text-xs text-slate-500" th:text="|${playableCount} tracks|">0 tracks</span>
+            <audio id="play-all-audio" controls preload="none" class="hidden h-9 w-full sm:w-auto"></audio>
+            <span id="play-all-status" class="hidden min-w-0 truncate text-xs text-slate-400" aria-live="polite"></span>
+            <div id="play-all-track-list" class="hidden" aria-hidden="true">
+                <span th:each="track : ${playableTracks}" data-play-track
+                      th:attr="data-source=@{/files/audio(path=${track.relativePath})}, data-title=${track.relativePath}"></span>
+            </div>
+        </section>
 
         <div th:if="${successMessage}" class="mt-5 rounded-lg border border-emerald-900/70 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200" th:text="${successMessage}"></div>
         <div th:if="${errorMessage}" class="mt-5 rounded-lg border border-rose-900/70 bg-rose-950/30 px-4 py-3 text-sm text-rose-200" th:text="${errorMessage}"></div>
@@ -140,6 +155,7 @@
             const bar = document.getElementById('download-bar');
             const contextMenu = document.getElementById('file-context-menu');
             const selectionForm = document.getElementById('selection-form');
+            const scope = document.getElementById('content')?.dataset.scope;
             const copyButton = selectionForm.querySelector('[formaction$="/files/copy"]');
             const deleteButton = selectionForm.querySelector('[formaction$="/files/delete"]');
             const pasteButton = document.querySelector('form[action$="/files/paste"] button');
@@ -218,6 +234,45 @@
                     event.preventDefault(); pasteButton.click();
                 }
             });
+            const playAllButton = document.getElementById('play-all');
+            if (playAllButton) {
+                const player = document.getElementById('play-all-audio');
+                const playerStatus = document.getElementById('play-all-status');
+                const tracks = [...document.querySelectorAll('[data-play-track]')]
+                    .map(track => ({ title: track.dataset.title, source: track.dataset.source }));
+                let currentTrack = 0;
+                let finished = false;
+                const playTrack = async index => {
+                    if (index >= tracks.length) {
+                        finished = true;
+                        playerStatus.textContent = `Finished playing ${tracks.length} tracks`;
+                        playerStatus.classList.remove('hidden');
+                        playAllButton.innerHTML = 'Play all again';
+                        return;
+                    }
+                    finished = false;
+                    currentTrack = index;
+                    player.src = tracks[index].source;
+                    player.classList.remove('hidden');
+                    playerStatus.textContent = `Playing ${index + 1} of ${tracks.length}: ${tracks[index].title}`;
+                    playerStatus.classList.remove('hidden');
+                    try { await player.play(); }
+                    catch (_) { playerStatus.textContent = 'Playback was blocked. Press play on the audio control to continue.'; }
+                };
+                player.addEventListener('ended', () => playTrack(currentTrack + 1));
+                playAllButton.addEventListener('click', () => {
+                    if (player.src && !player.paused) {
+                        player.pause();
+                        playAllButton.innerHTML = 'Resume playback';
+                    } else if (player.src && !finished) {
+                        player.play();
+                        playAllButton.innerHTML = 'Pause playback';
+                    } else {
+                        playTrack(0);
+                        playAllButton.innerHTML = 'Pause playback';
+                    }
+                });
+            }
             download.addEventListener('click', async () => {
                 const selected = choices.filter(item => item.checked).map(item => item.value);
                 if (!selected.length) return;

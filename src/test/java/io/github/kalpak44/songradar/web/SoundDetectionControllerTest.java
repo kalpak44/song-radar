@@ -103,21 +103,6 @@ class SoundDetectionControllerTest {
   }
 
   @Test
-  void findAndDownloadExplainsExpiredSourceRecording() throws Exception {
-    when(service.planDownload(23L)).thenReturn(DownloadPlanResult.RECORDING_EXPIRED);
-
-    mockMvc
-        .perform(post("/detections/23/download"))
-        .andExpect(status().is3xxRedirection())
-        .andExpect(redirectedUrl("/detections"))
-        .andExpect(
-            flash()
-                .attribute(
-                    "errorMessage",
-                    "The source recording has expired, so its listener library folder is unavailable."));
-  }
-
-  @Test
   void missingRecordingCannotBeDetected() throws Exception {
     when(recordings.findById(14L)).thenReturn(Optional.empty());
 

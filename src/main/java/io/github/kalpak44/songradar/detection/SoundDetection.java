@@ -19,4 +19,40 @@ public record SoundDetection(
     Instant firstDetectedAt,
     Instant detectedAt,
     int detectionCount,
-    String errorMessage) {}
+    String errorMessage,
+    String listenerName) {
+
+  /** Keep source compatibility for code that creates detections without listener context. */
+  public SoundDetection(
+      Long id,
+      Long recordingId,
+      DetectionStatus status,
+      String provider,
+      String trackKey,
+      String title,
+      String artist,
+      String album,
+      String releaseDate,
+      String trackUrl,
+      Instant firstDetectedAt,
+      Instant detectedAt,
+      int detectionCount,
+      String errorMessage) {
+    this(
+        id,
+        recordingId,
+        status,
+        provider,
+        trackKey,
+        title,
+        artist,
+        album,
+        releaseDate,
+        trackUrl,
+        firstDetectedAt,
+        detectedAt,
+        detectionCount,
+        errorMessage,
+        null);
+  }
+}

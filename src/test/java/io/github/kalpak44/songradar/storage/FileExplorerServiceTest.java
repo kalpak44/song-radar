@@ -40,6 +40,22 @@ class FileExplorerServiceTest {
   }
 
   @Test
+  void listsPlayableFilesRecursivelyForLibraryPlayback() throws IOException {
+    Files.createDirectories(root.resolve("library/Listener B"));
+    Files.createDirectories(root.resolve("library/Listener A"));
+    Files.writeString(root.resolve("library/Listener B/z song.mp3"), "audio");
+    Files.writeString(root.resolve("library/Listener A/a song.wav"), "audio");
+    Files.writeString(root.resolve("library/Listener A/notes.txt"), "text");
+    Files.writeString(root.resolve("library/Listener A/.songradar-download-part.mp3"), "partial");
+
+    List<LibraryFile> tracks = files.listPlayableRecursively("library");
+
+    assertEquals(
+        List.of("library/Listener A/a song.wav", "library/Listener B/z song.mp3"),
+        tracks.stream().map(LibraryFile::relativePath).toList());
+  }
+
+  @Test
   void rejectsPathTraversalAndPreventsDeletingRoot() {
     assertThrows(IllegalArgumentException.class, () -> files.list("../outside"));
     assertThrows(IllegalArgumentException.class, () -> files.delete(List.of("")));

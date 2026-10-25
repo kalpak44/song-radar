@@ -1,5 +1,6 @@
 package io.github.kalpak44.songradar.detection;
 
+import io.github.kalpak44.songradar.activity.ActivityEventRepository;
 import io.github.kalpak44.songradar.activity.ActivityKind;
 import io.github.kalpak44.songradar.activity.ActivityLog;
 import io.github.kalpak44.songradar.library.MusicDownloader;
@@ -34,6 +35,7 @@ public class SoundDetectionService {
   private final Path root;
   private final Path libraryRoot;
   private final SoundDetectionRepository detections;
+  private final ActivityEventRepository activityEvents;
   private final ListenerRecordingRepository recordings;
   private final PlaylistListenerRepository listeners;
   private final MusicDownloader downloader;
@@ -46,6 +48,7 @@ public class SoundDetectionService {
       @Value("${songradar.storage.recordings}") Path root,
       @Value("${songradar.storage.library}") Path libraryRoot,
       SoundDetectionRepository detections,
+      ActivityEventRepository activityEvents,
       ListenerRecordingRepository recordings,
       PlaylistListenerRepository listeners,
       MusicDownloader downloader,
@@ -57,6 +60,7 @@ public class SoundDetectionService {
     this.root = root.toAbsolutePath().normalize();
     this.libraryRoot = libraryRoot.toAbsolutePath().normalize();
     this.detections = detections;
+    this.activityEvents = activityEvents;
     this.recordings = recordings;
     this.listeners = listeners;
     this.downloader = downloader;
@@ -116,7 +120,8 @@ public class SoundDetectionService {
                 1,
                 status == DetectionStatus.UNAVAILABLE
                     ? "Recognition is disabled. Set SONGRADAR_AUDD_API_TOKEN to enable it."
-                    : null));
+                    : null,
+                listenerNameForRecording(recording)));
     if (status == DetectionStatus.PENDING) {
       schedule(saved);
     }
@@ -150,7 +155,8 @@ public class SoundDetectionService {
                 clock.instant(),
                 clock.instant(),
                 1,
-                null));
+                null,
+                listenerNameForRecording(recording)));
     schedule(pending);
     return ManualAttemptResult.QUEUED;
   }
@@ -231,7 +237,8 @@ public class SoundDetectionService {
               current.firstDetectedAt(),
               now,
               current.detectionCount() + 1,
-              null));
+              null,
+              first(pending.listenerName(), current.listenerName())));
       detections.deleteById(pending.id());
       return;
     }
@@ -250,7 +257,8 @@ public class SoundDetectionService {
             pending.firstDetectedAt(),
             now,
             pending.detectionCount(),
-            null);
+            null,
+            pending.listenerName());
     detections.save(candidate);
     queueDownloadPlan(candidate);
   }
@@ -259,25 +267,14 @@ public class SoundDetectionService {
     if (detection.recordingId() == null) {
       return;
     }
-    recordings
-        .findById(detection.recordingId())
-        .map(ListenerRecording::listenerId)
-        .filter(java.util.Objects::nonNull)
-        .flatMap(listeners::findById)
-        .ifPresentOrElse(
-            listener -> {
-              activity.record(
-                  ActivityKind.DETECTED,
-                  listener.name(),
-                  trackOf(detection),
-                  PROVIDER,
-                  "Identified from a recording");
-              downloader.download(detection, libraryRoot.resolve(safeFolderName(listener)));
-            },
-            () ->
-                log.info(
-                    "Skipped the download for detection {}: its listener is no longer available",
-                    detection.id()));
+    String listenerName = listenerNameFor(detection);
+    activity.record(
+        ActivityKind.DETECTED,
+        listenerName,
+        trackOf(detection),
+        PROVIDER,
+        "Identified from a recording");
+    downloader.download(detection, libraryRoot.resolve(safeFolderName(listenerName)));
     discardRecording(detection.recordingId());
   }
 
@@ -305,18 +302,35 @@ public class SoundDetectionService {
             });
   }
 
-  /** Null when the recording or its listener has since been removed. */
+  /** Prefer the stored listener identity; use activity history to recover older orphaned rows. */
   private String listenerNameFor(SoundDetection detection) {
-    if (detection.recordingId() == null) {
+    if (!blank(detection.listenerName())) {
+      return detection.listenerName();
+    }
+    if (detection.recordingId() != null) {
+      String currentListener =
+          recordings
+              .findById(detection.recordingId())
+              .map(ListenerRecording::listenerId)
+              .filter(java.util.Objects::nonNull)
+              .flatMap(listeners::findById)
+              .map(PlaylistListener::name)
+              .orElse(null);
+      if (!blank(currentListener)) {
+        return currentListener;
+      }
+    }
+    return activityEvents
+        .findLatestDetectedListener(trackOf(detection))
+        .filter(name -> !blank(name))
+        .orElse("Unknown listener");
+  }
+
+  private String listenerNameForRecording(ListenerRecording recording) {
+    if (recording.listenerId() == null) {
       return null;
     }
-    return recordings
-        .findById(detection.recordingId())
-        .map(ListenerRecording::listenerId)
-        .filter(java.util.Objects::nonNull)
-        .flatMap(listeners::findById)
-        .map(PlaylistListener::name)
-        .orElse(null);
+    return listeners.findById(recording.listenerId()).map(PlaylistListener::name).orElse(null);
   }
 
   private static String trackOf(SoundDetection detection) {
@@ -325,11 +339,11 @@ public class SoundDetectionService {
     return artist.isBlank() ? title : artist + " - " + title;
   }
 
-  private static String safeFolderName(PlaylistListener listener) {
-    String name = listener.name() == null ? "" : listener.name();
+  private static String safeFolderName(String name) {
+    name = name == null ? "" : name;
     String safe = name.replaceAll("[\\p{Cntrl}/\\\\:*?\"<>|]", " ").replaceAll("\\s+", " ").trim();
     if (safe.isBlank() || safe.equals(".") || safe.equals("..")) {
-      return "listener-" + listener.id();
+      return "Unknown listener";
     }
     return safe.length() > 120 ? safe.substring(0, 120).trim() : safe;
   }
@@ -360,7 +374,8 @@ public class SoundDetectionService {
             current.firstDetectedAt(),
             clock.instant(),
             count,
-            error));
+            error,
+            current.listenerName()));
   }
 
   public List<SoundDetection> page(int page, int pageSize) {
@@ -394,18 +409,8 @@ public class SoundDetectionService {
     if (detection.status() != DetectionStatus.MATCHED) {
       return DownloadPlanResult.NOT_IDENTIFIED;
     }
-    if (detection.recordingId() == null) {
-      return DownloadPlanResult.RECORDING_EXPIRED;
-    }
-    ListenerRecording recording = recordings.findById(detection.recordingId()).orElse(null);
-    if (recording == null || recording.listenerId() == null) {
-      return DownloadPlanResult.RECORDING_EXPIRED;
-    }
-    PlaylistListener listener = listeners.findById(recording.listenerId()).orElse(null);
-    if (listener == null) {
-      return DownloadPlanResult.RECORDING_EXPIRED;
-    }
-    downloader.download(detection, libraryRoot.resolve(safeFolderName(listener)));
+    String listenerName = listenerNameFor(detection);
+    downloader.download(detection, libraryRoot.resolve(safeFolderName(listenerName)));
     return DownloadPlanResult.PLANNED;
   }
 
@@ -413,7 +418,6 @@ public class SoundDetectionService {
     PLANNED,
     NOT_FOUND,
     NOT_IDENTIFIED,
-    RECORDING_EXPIRED
   }
 
   private static String trackKey(String title, String artist) {

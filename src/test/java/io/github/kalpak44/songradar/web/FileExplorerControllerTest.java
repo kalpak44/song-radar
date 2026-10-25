@@ -20,9 +20,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
 import io.github.kalpak44.songradar.storage.FileExplorerService;
+import io.github.kalpak44.songradar.storage.LibraryFile;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,8 +45,9 @@ class FileExplorerControllerTest {
   @TempDir Path root;
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     when(files.root()).thenReturn(root);
+    when(files.listPlayableRecursively("library")).thenReturn(List.of());
   }
 
   @Test
@@ -66,6 +69,30 @@ class FileExplorerControllerTest {
             model().attribute("storageRoot", root.resolve("library").normalize().toString()));
 
     assertThat(Files.isDirectory(root.resolve("library"))).isTrue();
+  }
+
+  @Test
+  void musicLibraryShowsPlayAllAcrossListenerFolders() throws Exception {
+    when(files.relative(any())).thenReturn("library");
+    when(files.list("library"))
+        .thenReturn(
+            List.of(new LibraryFile("Listener", "library/Listener", true, 0, Instant.EPOCH)));
+    when(files.listPlayableRecursively("library"))
+        .thenReturn(
+            List.of(
+                new LibraryFile(
+                    "song.mp3", "library/Listener/song.mp3", false, 100, Instant.EPOCH)));
+
+    mockMvc
+        .perform(get("/library"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("playableCount", 1))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(containsString("Play all")))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(containsString("library/Listener/song.mp3")));
   }
 
   @Test

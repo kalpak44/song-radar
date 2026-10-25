@@ -124,20 +124,48 @@
                             <p th:if="${#fields.hasErrors('durationSeconds')}" th:errors="*{durationSeconds}"
                                class="mt-1.5 text-xs text-red-300">Duration error</p>
                         </div>
-                        <div class="sm:col-span-2">
-                            <label for="listenWindows" class="mb-1.5 block text-xs font-medium text-slate-400">Listen only during</label>
-                            <input id="listenWindows" type="text" th:field="*{listenWindows}"
-                                   placeholder="00:00-06:00, 09:00-13:00"
-                                   th:errorclass="border-red-700"
-                                   class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 font-mono
-                                          text-sm text-slate-100 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-none">
-                            <p class="mt-1.5 text-xs text-slate-500">
-                                Comma-separated <span class="font-mono">HH:mm-HH:mm</span> windows, as many as you like. Leave empty to record around the clock.
-                                A window may run past midnight, so <span class="font-mono">22:00-02:00</span> is four hours.
-                                Times are <span class="font-mono" th:text="${listenerTimezone}">UTC</span>.
-                            </p>
-                            <p th:if="${#fields.hasErrors('listenWindows')}" th:errors="*{listenWindows}"
-                               class="mt-1.5 text-xs text-red-300">Windows error</p>
+                        <div class="sm:col-span-2 rounded-xl border border-slate-800 bg-slate-950/35 p-4 sm:p-5">
+                            <div class="flex flex-wrap items-center justify-between gap-4">
+                                <div>
+                                    <h3 class="text-sm font-medium text-slate-200">Listening time windows</h3>
+                                    <p class="mt-1 text-xs leading-5 text-slate-500">Leave disabled to listen around the clock. Times use
+                                        <span class="font-mono text-slate-300" th:text="${listenerTimezone}">UTC</span>.
+                                    </p>
+                                </div>
+                                <label for="schedule-enabled" class="inline-flex cursor-pointer items-center gap-2.5 rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-xs font-medium text-slate-300">
+                                    <input id="schedule-enabled" type="checkbox" th:field="*{scheduled}"
+                                           class="size-4 rounded border-slate-600 bg-slate-950 text-emerald-400 focus:ring-emerald-400/40">
+                                    <span>Use schedule</span>
+                                </label>
+                            </div>
+                            <div id="window-editor" class="mt-4" th:attr="aria-disabled=${!listenerForm.scheduled}">
+                                <div id="listen-window-rows" class="space-y-2.5">
+                                    <div th:each="start, rowStat : ${listenerForm.windowStart}" data-window-row
+                                         class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.5rem] items-end gap-2 rounded-lg border border-slate-800/80 bg-black/15 p-3">
+                                        <div>
+                                            <label th:for="|windowStart${rowStat.index}|" class="mb-1.5 block text-[0.68rem] font-medium uppercase tracking-wide text-slate-500">From</label>
+                                            <input type="time" th:field="*{windowStart[__${rowStat.index}__]}" data-window-start
+                                                   class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 font-mono text-sm text-slate-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-45">
+                                        </div>
+                                        <div>
+                                            <label th:for="|windowEnd${rowStat.index}|" class="mb-1.5 block text-[0.68rem] font-medium uppercase tracking-wide text-slate-500">Until</label>
+                                            <input type="time" th:field="*{windowEnd[__${rowStat.index}__]}" data-window-end
+                                                   class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 font-mono text-sm text-slate-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-45">
+                                        </div>
+                                        <button type="button" data-remove-window aria-label="Remove listening window"
+                                                class="grid size-10 cursor-pointer place-items-center rounded-lg border border-slate-800 text-slate-500 transition hover:border-rose-800/70 hover:bg-rose-950/30 hover:text-rose-300 focus-visible:outline-2 focus-visible:outline-rose-400 disabled:cursor-not-allowed disabled:opacity-35">
+                                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 7h14M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>
+                                        </button>
+                                    </div>
+                                </div>
+                                <button id="add-listen-window" type="button"
+                                        class="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium text-slate-300 transition hover:border-emerald-700 hover:bg-emerald-950/25 hover:text-emerald-200 focus-visible:outline-2 focus-visible:outline-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">
+                                    <span aria-hidden="true" class="text-base leading-none">+</span> Add time window
+                                </button>
+                            </div>
+                            <p class="mt-2 text-xs leading-5 text-slate-500">Windows may cross midnight—for example, 22:00 to 02:00. Each window starts at its first time and stops at its end.</p>
+                            <p th:if="${#fields.hasErrors('windowStart')}" th:errors="*{windowStart}"
+                               class="mt-2 text-xs text-red-300">Check the listening windows.</p>
                         </div>
                     </div>
                 </section>
@@ -186,6 +214,10 @@
             const empty = document.getElementById('no-channel-results');
             const clear = document.getElementById('clear-channel-search');
             const name = document.getElementById('name');
+            const scheduleEnabled = document.getElementById('schedule-enabled');
+            const windowEditor = document.getElementById('window-editor');
+            const windowRows = document.getElementById('listen-window-rows');
+            const addWindow = document.getElementById('add-listen-window');
             if (!search) return;
 
             let generatedName = '';
@@ -259,6 +291,46 @@
                 filterChannels();
                 search.focus();
             });
+
+            if (scheduleEnabled && windowEditor && windowRows && addWindow) {
+                let nextWindowIndex = Math.max(-1, ...[...windowRows.querySelectorAll('[name^="windowStart["]')]
+                    .map(input => Number(input.name.substring(input.name.indexOf('[') + 1, input.name.indexOf(']'))))) + 1;
+
+                const syncSchedule = () => {
+                    const enabled = scheduleEnabled.checked;
+                    windowEditor.setAttribute('aria-disabled', String(!enabled));
+                    windowEditor.querySelectorAll('input[type="time"], button').forEach(control => {
+                        control.disabled = !enabled;
+                    });
+                };
+                const syncRemoveButtons = () => {
+                    const buttons = [...windowRows.querySelectorAll('[data-remove-window]')];
+                    buttons.forEach(button => button.disabled = !scheduleEnabled.checked || buttons.length <= 1);
+                };
+                const bindRemove = button => button.addEventListener('click', () => {
+                    if (windowRows.children.length > 1) button.closest('[data-window-row]')?.remove();
+                    syncRemoveButtons();
+                });
+                windowRows.querySelectorAll('[data-remove-window]').forEach(bindRemove);
+                scheduleEnabled.addEventListener('change', () => {
+                    syncSchedule();
+                    syncRemoveButtons();
+                });
+                addWindow.addEventListener('click', () => {
+                    const index = nextWindowIndex++;
+                    const row = document.createElement('div');
+                    row.dataset.windowRow = '';
+                    row.className = 'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_2.5rem] items-end gap-2 rounded-lg border border-slate-800/80 bg-black/15 p-3';
+                    row.innerHTML = `<div><label for="windowStart${index}" class="mb-1.5 block text-[0.68rem] font-medium uppercase tracking-wide text-slate-500">From</label><input id="windowStart${index}" name="windowStart[${index}]" type="time" data-window-start class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 font-mono text-sm text-slate-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-45"></div><div><label for="windowEnd${index}" class="mb-1.5 block text-[0.68rem] font-medium uppercase tracking-wide text-slate-500">Until</label><input id="windowEnd${index}" name="windowEnd[${index}]" type="time" data-window-end class="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 font-mono text-sm text-slate-100 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-45"></div><button type="button" data-remove-window aria-label="Remove listening window" class="grid size-10 cursor-pointer place-items-center rounded-lg border border-slate-800 text-slate-500 transition hover:border-rose-800/70 hover:bg-rose-950/30 hover:text-rose-300 focus-visible:outline-2 focus-visible:outline-rose-400 disabled:cursor-not-allowed disabled:opacity-35"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 7h14M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg></button>`;
+                    windowRows.append(row);
+                    bindRemove(row.querySelector('[data-remove-window]'));
+                    syncSchedule();
+                    syncRemoveButtons();
+                    row.querySelector('[data-window-start]').focus();
+                });
+                syncSchedule();
+                syncRemoveButtons();
+            }
         })();
     </script>
 </main>
