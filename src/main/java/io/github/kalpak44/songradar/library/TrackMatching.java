@@ -47,9 +47,12 @@ final class TrackMatching {
 
   static double score(String candidate, String artist, String title) {
     String haystack = normalise(candidate);
+    // Distinct, or a title like "Sing Sing Sing" scores three fifths for a candidate that
+    // contains the word once and nothing else of the artist or the song.
     List<String> wanted =
         Arrays.stream(normalise(artist + " " + title).split(" "))
             .filter(w -> !w.isBlank())
+            .distinct()
             .toList();
     if (wanted.isEmpty() || haystack.isEmpty()) {
       return 0;

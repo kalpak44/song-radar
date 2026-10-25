@@ -11,7 +11,6 @@ stops working.
 | 2 | SoundCloud | undocumented | HLS: MPEG or AAC in fMP4 | only for the AAC variants |
 | 3 | JioSaavn | undocumented | progressive AAC in MP4 | always |
 | 4 | Bandcamp | undocumented | MP3 128 kbps | none |
-| 5 | Internet Archive | documented, public | MP3 | none |
 
 ## What breaks, and where to look
 
@@ -39,12 +38,6 @@ other safe form, and is what the sources that fetch an API-supplied URL use.
 attribute holding HTML-escaped JSON. Its catalogue leans towards remixes and reworks, which is what
 the matcher's marker list is for.
 
-**Internet Archive needs a fielded query.** A bare one matches descriptions and the full text of
-scanned books, so a song title answers with anything that ever mentioned it. Creator is left out of
-the query because it is often absent or spelled differently, and the candidates are scored instead.
-An item is frequently a whole concert, so the file within it is chosen by name — against the title
-alone, since a file inside an artist's item is rarely named after the artist.
-
 **Audius is reached through a discovery node** rather than a fixed host; the registry at
 `api.audius.co` names the ones currently serving.
 
@@ -70,6 +63,12 @@ Ruled out while chasing this, and worth not re-checking: sample byte order (the 
 big-endian unless told otherwise, which is now set explicitly), the `trun` `data_offset` (now
 honoured), dropped or failed frames (every frame decodes to a full 1024 samples), and the sample
 rate.
+
+**Internet Archive was tried and dropped.** It serves MP3 and needs no credential, which is why it
+looked worth having, but a search for a song answers with sermons, podfics and audiobooks that
+mention the words — its catalogue is not current music. It contributed nothing the other four did
+not already cover, while adding a search to every failed download and a probe that kept reporting
+the whole chain broken.
 
 ## Reference implementation
 

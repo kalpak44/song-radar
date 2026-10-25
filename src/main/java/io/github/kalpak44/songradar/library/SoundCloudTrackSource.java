@@ -111,6 +111,9 @@ public class SoundCloudTrackSource implements TrackSource {
     }
     return response.collection().stream()
         .filter(track -> track.media() != null && track.track_authorization() != null)
+        // A snipped upload streams a preview of about thirty seconds. It downloads cleanly and
+        // is the right format, so only its size gives it away — skip it before fetching.
+        .filter(track -> !"SNIP".equals(track.policy()))
         // An upload offering nothing but HE-AAC is passed over here rather than ranked last,
         // so a lower-scoring upload that can be transcoded faithfully still gets its turn.
         .filter(track -> !usable(track).isEmpty())
@@ -279,7 +282,13 @@ public class SoundCloudTrackSource implements TrackSource {
 
   record SearchResponse(List<Track> collection) {}
 
-  record Track(String title, long duration, String track_authorization, Media media, User user) {}
+  record Track(
+      String title,
+      long duration,
+      String policy,
+      String track_authorization,
+      Media media,
+      User user) {}
 
   record Media(List<Transcoding> transcodings) {}
 

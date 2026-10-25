@@ -35,9 +35,9 @@ class SourceAvailabilityTest {
           new Probe(
               new SoundCloudTrackSource(),
               List.of(
-                  new String[] {"Daft Punk", "Get Lucky"},
                   // Served as an MPEG playlist rather than AAC, which is a separate path.
-                  new String[] {"Jonas Blue", "We Could Go Back"})),
+                  new String[] {"Jonas Blue", "We Could Go Back"},
+                  new String[] {"Кино", "Группа крови"})),
           new Probe(
               new JioSaavnTrackSource(),
               List.of(
@@ -47,12 +47,7 @@ class SourceAvailabilityTest {
               new BandcampTrackSource(),
               List.of(
                   new String[] {"Amanda Palmer", "In My Mind"},
-                  new String[] {"Car Seat Headrest", "Something Soon"})),
-          new Probe(
-              new InternetArchiveTrackSource(),
-              List.of(
-                  new String[] {"Scott Joplin", "Maple Leaf Rag"},
-                  new String[] {"Glenn Miller", "In The Mood"})));
+                  new String[] {"Car Seat Headrest", "Something Soon"})));
 
   /**
    * A non-ASCII query is encoded differently by every one of these clients, and getting it wrong
