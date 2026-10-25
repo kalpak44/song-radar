@@ -19,6 +19,16 @@
                 <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.5-.86l11 6.5a1 1 0 0 1 0 1.72l-11 6.5A1 1 0 0 1 7 17.5z"/></svg>
                 Play all
             </button>
+            <div class="flex items-center gap-1 rounded-lg border border-slate-800 bg-slate-950/60 p-1" aria-label="Playback navigation">
+                <button id="play-previous" type="button" disabled aria-label="Play previous track" title="Previous track"
+                        class="grid size-9 cursor-pointer place-items-center rounded-md text-slate-300 transition hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-35">
+                    <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 5h2v14H6zM19 5.7v12.6a1 1 0 0 1-1.5.86l-9-6.3a1 1 0 0 1 0-1.72l9-6.3a1 1 0 0 1 1.5.86z"/></svg>
+                </button>
+                <button id="play-next" type="button" disabled aria-label="Play next track" title="Next track"
+                        class="grid size-9 cursor-pointer place-items-center rounded-md text-slate-300 transition hover:bg-slate-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-35">
+                    <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16 5h2v14h-2zM5 5.7a1 1 0 0 1 1.5-.86l9 6.3a1 1 0 0 1 0 1.72l-9 6.3A1 1 0 0 1 5 18.3z"/></svg>
+                </button>
+            </div>
             <span class="text-sm text-slate-300">Play every saved track in the library in order</span>
             <span class="ml-auto font-mono text-xs text-slate-500" th:text="|${playableCount} tracks|">0 tracks</span>
             <audio id="play-all-audio" controls preload="none" class="hidden h-9 w-full sm:w-auto"></audio>
@@ -107,9 +117,15 @@
                                 </a>
                                 <div th:unless="${file.directory}" class="flex min-w-0 items-center gap-3">
                                     <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-800 text-slate-400"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>
-                                    <div class="min-w-0">
+                                <div class="min-w-0">
                                         <a th:href="@{/files/download(path=${file.relativePath})}" th:text="${file.name}" class="block truncate font-medium text-slate-200 hover:text-emerald-300">file.mp3</a>
                                         <audio th:if="${file.playable}" controls preload="none" th:src="@{/files/audio(path=${file.relativePath})}" th:aria-label="'Play ' + ${file.name}" class="mt-2 h-8 max-w-[18rem]"></audio>
+                                        <button th:if="${scope == 'library' and file.playable}" type="button" data-remove-track
+                                                th:attr="aria-label='Remove ' + ${file.name}, title='Remove from Music library'"
+                                                class="mt-1 inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-[0.68rem] font-medium text-slate-500 transition hover:bg-rose-950/40 hover:text-rose-300 focus-visible:outline-2 focus-visible:outline-rose-400">
+                                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M5.5 7l1 13h11l1-13M9 7V4h6v3"/></svg>
+                                            Remove track
+                                        </button>
                                     </div>
                                 </div>
                             </td>
@@ -238,16 +254,23 @@
             if (playAllButton) {
                 const player = document.getElementById('play-all-audio');
                 const playerStatus = document.getElementById('play-all-status');
+                const previousButton = document.getElementById('play-previous');
+                const nextButton = document.getElementById('play-next');
                 const tracks = [...document.querySelectorAll('[data-play-track]')]
                     .map(track => ({ title: track.dataset.title, source: track.dataset.source }));
                 let currentTrack = 0;
                 let finished = false;
+                const syncTransport = () => {
+                    previousButton.disabled = currentTrack <= 0 || tracks.length < 2;
+                    nextButton.disabled = finished || tracks.length < 2;
+                };
                 const playTrack = async index => {
                     if (index >= tracks.length) {
                         finished = true;
                         playerStatus.textContent = `Finished playing ${tracks.length} tracks`;
                         playerStatus.classList.remove('hidden');
                         playAllButton.innerHTML = 'Play all again';
+                        syncTransport();
                         return;
                     }
                     finished = false;
@@ -256,10 +279,13 @@
                     player.classList.remove('hidden');
                     playerStatus.textContent = `Playing ${index + 1} of ${tracks.length}: ${tracks[index].title}`;
                     playerStatus.classList.remove('hidden');
+                    syncTransport();
                     try { await player.play(); }
                     catch (_) { playerStatus.textContent = 'Playback was blocked. Press play on the audio control to continue.'; }
                 };
                 player.addEventListener('ended', () => playTrack(currentTrack + 1));
+                previousButton.addEventListener('click', () => playTrack(currentTrack - 1));
+                nextButton.addEventListener('click', () => playTrack(currentTrack + 1));
                 playAllButton.addEventListener('click', () => {
                     if (player.src && !player.paused) {
                         player.pause();
@@ -272,7 +298,19 @@
                         playAllButton.innerHTML = 'Pause playback';
                     }
                 });
+                syncTransport();
             }
+            document.querySelectorAll('[data-remove-track]').forEach(button => button.addEventListener('click', () => {
+                const row = button.closest('.file-row');
+                const choice = row?.querySelector('.file-choice');
+                if (!choice) return;
+                const trackName = button.getAttribute('aria-label')?.replace(/^Remove /, '') || 'this track';
+                if (!confirm(`Remove ${trackName} from Music library? This permanently deletes the file.`)) return;
+                choices.forEach(item => item.checked = false);
+                choice.checked = true;
+                refresh();
+                selectionForm.requestSubmit(deleteButton);
+            }));
             download.addEventListener('click', async () => {
                 const selected = choices.filter(item => item.checked).map(item => item.value);
                 if (!selected.length) return;

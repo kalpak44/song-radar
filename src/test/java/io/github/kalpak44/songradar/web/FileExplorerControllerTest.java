@@ -92,7 +92,35 @@ class FileExplorerControllerTest {
                 .string(containsString("Play all")))
         .andExpect(
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
-                .string(containsString("library/Listener/song.mp3")));
+                .string(containsString("library/Listener/song.mp3")))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(containsString("play-previous")))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(containsString("play-next")));
+  }
+
+  @Test
+  void playableLibraryFileHasAConfirmedRemoveAction() throws Exception {
+    Path folder = root.resolve("library/Listener");
+    when(files.fileOrDirectory("library/Listener")).thenReturn(folder);
+    when(files.relative(folder)).thenReturn("library/Listener");
+    when(files.list("library/Listener"))
+        .thenReturn(
+            List.of(
+                new LibraryFile(
+                    "song.mp3", "library/Listener/song.mp3", false, 100, Instant.EPOCH)));
+
+    mockMvc
+        .perform(get("/library").param("path", "Listener"))
+        .andExpect(status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(containsString("Remove track")))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
+                .string(containsString("Remove song.mp3")));
   }
 
   @Test
