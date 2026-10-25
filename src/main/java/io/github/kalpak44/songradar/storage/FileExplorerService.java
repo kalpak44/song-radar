@@ -159,16 +159,6 @@ public class FileExplorerService {
                     throws IOException {
                   if (Files.isSymbolicLink(dir))
                     throw new IOException("Symbolic links cannot be downloaded.");
-                  String entry =
-                      relative(source)
-                          + "/"
-                          + source
-                              .relativize(dir)
-                              .toString()
-                              .replace(dir.getFileSystem().getSeparator(), "/");
-                  if (!entry.endsWith("/")) entry += "/";
-                  zip.putNextEntry(new ZipEntry(entry));
-                  zip.closeEntry();
                   return FileVisitResult.CONTINUE;
                 }
 
