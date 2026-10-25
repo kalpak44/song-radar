@@ -36,7 +36,8 @@ class SourceAvailabilityTest {
               new SoundCloudTrackSource(),
               List.of(
                   new String[] {"Daft Punk", "Get Lucky"},
-                  new String[] {"Rick Astley", "Never Gonna Give You Up"})),
+                  // Served as an MPEG playlist rather than AAC, which is a separate path.
+                  new String[] {"Jonas Blue", "We Could Go Back"})),
           new Probe(
               new JioSaavnTrackSource(),
               List.of(

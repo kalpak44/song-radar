@@ -134,10 +134,16 @@ public class SoundCloudTrackSource implements TrackSource {
 
   /** Lower is better: no transcode, then AAC-LC, then HE-AAC. */
   private static int fidelity(Transcoding transcoding) {
-    if ("audio/mpegurl".equals(transcoding.format().mime_type())) {
+    if (isMpeg(transcoding)) {
       return 0;
     }
     return "aac_160k".equals(transcoding.preset()) ? 1 : 2;
+  }
+
+  /** MPEG playlists come labelled both audio/mpeg and audio/mpegurl. */
+  private static boolean isMpeg(Transcoding transcoding) {
+    String mime = transcoding.format().mime_type();
+    return mime != null && mime.startsWith("audio/mpeg");
   }
 
   private void writeTranscoding(
@@ -173,14 +179,16 @@ public class SoundCloudTrackSource implements TrackSource {
       throw new IOException("the playlist listed no audio segments");
     }
 
-    if ("audio/mpegurl".equals(transcoding.format().mime_type())) {
+    // The playlist decides, not the advertised type: segments with no initialisation
+    // segment in front of them are MPEG audio, and concatenating them is the whole job.
+    if (initSegment == null) {
+      if (!isMpeg(transcoding)) {
+        throw new IOException("the AAC playlist has no initialisation segment");
+      }
       for (String segment : segments) {
         out.write(bytes(segment));
       }
       return;
-    }
-    if (initSegment == null) {
-      throw new IOException("the AAC playlist has no initialisation segment");
     }
     Mp3Encoding.encode(
         Mp4Aac.audioSpecificConfig(bytes(initSegment)), new FragmentFrames(segments), out);
