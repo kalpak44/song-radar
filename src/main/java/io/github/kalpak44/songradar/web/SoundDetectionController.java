@@ -1,18 +1,9 @@
 package io.github.kalpak44.songradar.web;
 
-import io.github.kalpak44.songradar.detection.SoundDetection;
 import io.github.kalpak44.songradar.detection.SoundDetectionService;
 import io.github.kalpak44.songradar.detection.SoundDetectionService.ManualAttemptResult;
 import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
-import io.github.kalpak44.songradar.listener.PlaylistListener;
-import io.github.kalpak44.songradar.listener.PlaylistListenerRepository;
-import io.github.kalpak44.songradar.playlist.PlaylistSource;
-import io.github.kalpak44.songradar.playlist.PlaylistSourceRepository;
-import java.time.Clock;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,21 +18,11 @@ public class SoundDetectionController {
 
   private final SoundDetectionService service;
   private final ListenerRecordingRepository recordings;
-  private final PlaylistListenerRepository listeners;
-  private final PlaylistSourceRepository playlists;
-  private final Clock clock;
 
   public SoundDetectionController(
-      SoundDetectionService service,
-      ListenerRecordingRepository recordings,
-      PlaylistListenerRepository listeners,
-      PlaylistSourceRepository playlists,
-      Clock clock) {
+      SoundDetectionService service, ListenerRecordingRepository recordings) {
     this.service = service;
     this.recordings = recordings;
-    this.listeners = listeners;
-    this.playlists = playlists;
-    this.clock = clock;
   }
 
   @GetMapping("/detections")
@@ -49,16 +30,7 @@ public class SoundDetectionController {
     long total = service.count();
     int pages = (int) Math.max(1, (total + PAGE_SIZE - 1) / PAGE_SIZE);
     int current = Math.max(1, Math.min(page, pages));
-    Map<Long, PlaylistListener> listenerById =
-        listeners.findAll().stream()
-            .collect(Collectors.toMap(PlaylistListener::id, Function.identity()));
-    Map<Long, PlaylistSource> playlistById =
-        playlists.findAll().stream()
-            .collect(Collectors.toMap(PlaylistSource::id, Function.identity()));
-    var rows =
-        service.page(current, PAGE_SIZE).stream()
-            .map(detection -> row(detection, listenerById, playlistById))
-            .toList();
+    var rows = service.page(current, PAGE_SIZE);
     model.addAttribute("activeNav", "detections");
     model.addAttribute("rows", rows);
     model.addAttribute("configured", service.isConfigured());
@@ -66,7 +38,6 @@ public class SoundDetectionController {
     model.addAttribute("total", total);
     model.addAttribute("currentPage", current);
     model.addAttribute("totalPages", pages);
-    model.addAttribute("localZone", clock.getZone().getId());
     return "detections";
   }
 
@@ -95,36 +66,4 @@ public class SoundDetectionController {
     }
     return "redirect:/recordings";
   }
-
-  private DetectionRow row(
-      SoundDetection detection,
-      Map<Long, PlaylistListener> listenerById,
-      Map<Long, PlaylistSource> playlistById) {
-    ListenerRecording recording =
-        detection.recordingId() == null
-            ? null
-            : recordings.findById(detection.recordingId()).orElse(null);
-    PlaylistListener listener = recording == null ? null : listenerById.get(recording.listenerId());
-    PlaylistSource playlist =
-        listener == null ? null : playlistById.get(listener.playlistSourceId());
-    return new DetectionRow(
-        detection,
-        listener == null ? null : listener.id(),
-        listener == null ? "Removed listener" : listener.name(),
-        listener == null ? "" : listener.channelName(),
-        playlist == null ? "Removed playlist" : playlist.name(),
-        playlist == null ? null : playlist.id(),
-        recording == null ? null : recording.id(),
-        recording == null ? null : recording.completedAt());
-  }
-
-  public record DetectionRow(
-      SoundDetection detection,
-      Long listenerId,
-      String listenerName,
-      String channelName,
-      String playlistName,
-      Long playlistId,
-      Long recordingId,
-      java.time.Instant recordedAt) {}
 }

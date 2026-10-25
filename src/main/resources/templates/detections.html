@@ -56,18 +56,14 @@
                             </div>
                             <p class="mt-1 text-sm text-slate-400" th:if="${row.detection.artist != null}" th:text="${row.detection.artist}">Artist</p>
                             <p class="mt-1 text-xs leading-5 text-slate-500" th:if="${row.detection.album != null}" th:text="${row.detection.album}">Album</p>
-                            <p class="mt-2 text-xs text-slate-500">
-                                <span th:text="${row.channelName}">Channel</span> <span aria-hidden="true">·</span> <span th:text="${row.listenerName}">Listener</span> <span aria-hidden="true">·</span> <span th:text="${row.playlistName}">Playlist</span>
-                            </p>
                             <p th:if="${row.detection.errorMessage != null}" class="mt-2 max-w-2xl text-xs text-amber-200/75" th:text="${row.detection.errorMessage}">Provider error</p>
                         </div>
                     </div>
                     <div class="ml-12 flex min-w-40 flex-col items-start gap-2 text-xs text-slate-500 sm:ml-0 sm:items-end">
                         <span><span th:text="${row.detection.detectionCount}">1</span> <span th:text="${row.detection.detectionCount == 1 ? 'detection' : 'detections'}">detections</span></span>
-                        <time data-local-time="compact" th:if="${row.recordedAt != null}" th:attr="datetime=${row.recordedAt}">Recently</time>
-                        <span th:if="${row.recordedAt == null}" class="text-slate-600">Recording removed</span>
+                        <span class="text-slate-600">Last detected</span>
+                        <time data-local-time="compact" th:attr="datetime=${row.detection.detectedAt}" th:text="${row.detection.detectedAt}">Recently</time>
                         <a th:if="${row.detection.trackUrl != null}" th:href="${row.detection.trackUrl}" target="_blank" rel="noreferrer" class="font-medium text-emerald-300 transition hover:text-emerald-200">Open track ↗</a>
-                        <a th:if="${row.playlistId != null and row.listenerId != null and row.recordingId != null}" th:href="@{/playlists/{playlistId}/listeners/{listenerId}/recordings/{recordingId}/audio(playlistId=${row.playlistId},listenerId=${row.listenerId},recordingId=${row.recordingId})}" class="font-medium text-slate-400 transition hover:text-slate-200">Play source recording</a>
                     </div>
                 </article>
             </div>
