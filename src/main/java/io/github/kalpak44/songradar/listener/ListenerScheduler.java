@@ -17,6 +17,7 @@ public class ListenerScheduler {
   private final PlaylistListenerRepository listeners;
   private final RecordingService recordingService;
   private final Clock clock;
+  private final ListeningSchedule schedule;
   private final ConcurrentHashMap<Long, ScheduledFuture<?>> scheduled = new ConcurrentHashMap<>();
   private final Set<Long> running = ConcurrentHashMap.newKeySet();
 
@@ -24,11 +25,13 @@ public class ListenerScheduler {
       TaskScheduler taskScheduler,
       PlaylistListenerRepository listeners,
       RecordingService recordingService,
-      Clock clock) {
+      Clock clock,
+      ListeningSchedule schedule) {
     this.taskScheduler = taskScheduler;
     this.listeners = listeners;
     this.recordingService = recordingService;
     this.clock = clock;
+    this.schedule = schedule;
   }
 
   @EventListener(ApplicationReadyEvent.class)
@@ -41,7 +44,8 @@ public class ListenerScheduler {
     if (listener.status() == ListenerStatus.ACTIVE) {
       Instant now = clock.instant();
       Instant next = listener.nextRecordingAt();
-      schedule(listener.id(), next == null || next.isBefore(now) ? now : next);
+      Instant due = next == null || next.isBefore(now) ? now : next;
+      schedule(listener.id(), schedule.nextOpening(listener.listenWindows(), due));
     }
   }
 
@@ -74,9 +78,20 @@ public class ListenerScheduler {
   }
 
   private void recordAndScheduleNext(PlaylistListener listener) {
+    Instant startedAt = clock.instant();
+    // The window can close between a task being scheduled and it running — a listener paused
+    // and resumed, or simply an interval that steps over the end of the window.
+    if (!schedule.isOpen(listener.listenWindows(), startedAt)) {
+      Instant reopens = schedule.nextOpening(listener.listenWindows(), startedAt);
+      listeners.updateAfterRecording(listener.id(), listener.lastRecordingAt(), reopens, startedAt);
+      schedule(listener.id(), reopens);
+      return;
+    }
     RecordingAttempt attempt = recordingService.record(listener);
     Instant updatedAt = clock.instant();
-    Instant next = updatedAt.plusSeconds(listener.recordingIntervalSeconds());
+    Instant next =
+        schedule.nextOpening(
+            listener.listenWindows(), updatedAt.plusSeconds(listener.recordingIntervalSeconds()));
     listeners.updateAfterRecording(listener.id(), attempt.startedAt(), next, updatedAt);
     listeners
         .findById(listener.id())

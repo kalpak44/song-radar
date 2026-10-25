@@ -124,6 +124,21 @@
                             <p th:if="${#fields.hasErrors('durationSeconds')}" th:errors="*{durationSeconds}"
                                class="mt-1.5 text-xs text-red-300">Duration error</p>
                         </div>
+                        <div class="sm:col-span-2">
+                            <label for="listenWindows" class="mb-1.5 block text-xs font-medium text-slate-400">Listen only during</label>
+                            <input id="listenWindows" type="text" th:field="*{listenWindows}"
+                                   placeholder="00:00-06:00, 09:00-13:00"
+                                   th:errorclass="border-red-700"
+                                   class="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 font-mono
+                                          text-sm text-slate-100 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600 focus:outline-none">
+                            <p class="mt-1.5 text-xs text-slate-500">
+                                Comma-separated <span class="font-mono">HH:mm-HH:mm</span> windows, as many as you like. Leave empty to record around the clock.
+                                A window may run past midnight, so <span class="font-mono">22:00-02:00</span> is four hours.
+                                Times are <span class="font-mono" th:text="${listenerTimezone}">UTC</span>.
+                            </p>
+                            <p th:if="${#fields.hasErrors('listenWindows')}" th:errors="*{listenWindows}"
+                               class="mt-1.5 text-xs text-red-300">Windows error</p>
+                        </div>
                     </div>
                 </section>
             </div>

@@ -81,7 +81,7 @@ class SourcedMusicDownloaderTest {
 
       @Override
       public Optional<SourceTrack> find(String artist, String title) {
-        return Optional.of(new SourceTrack(name, title, artist, 1000, out -> out.write(audio)));
+        return Optional.of(new SourceTrack(name, title, artist, 0, out -> out.write(audio)));
       }
     };
   }
@@ -157,6 +157,30 @@ class SourcedMusicDownloaderTest {
   void rejectsASourceThatAnswersWithSomethingOtherThanAudio() throws IOException {
     new SourcedMusicDownloader(
             List.of(serving("page", "<html>not found</html>".getBytes(StandardCharsets.UTF_8))))
+        .download(detection("Daft Punk", "Get Lucky"), library);
+
+    assertThat(contents()).isEmpty();
+  }
+
+  /** A catalogue that streams a preview for a track it will not give away. */
+  @Test
+  void rejectsAPreviewServedInPlaceOfTheTrack() throws IOException {
+    TrackSource preview =
+        new TrackSource() {
+          @Override
+          public String name() {
+            return "preview";
+          }
+
+          @Override
+          public Optional<SourceTrack> find(String artist, String title) {
+            // Ninety seconds of audio offered as a four-minute track.
+            return Optional.of(
+                new SourceTrack(name(), title, artist, 240_000, out -> out.write(track)));
+          }
+        };
+
+    new SourcedMusicDownloader(List.of(preview))
         .download(detection("Daft Punk", "Get Lucky"), library);
 
     assertThat(contents()).isEmpty();

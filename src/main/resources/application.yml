@@ -31,6 +31,9 @@ server:
   port: ${SONGRADAR_PORT:8080}
 
 songradar:
+  # Listening windows are wall-clock times; the clock the application runs on is UTC, so this is
+  # what decides whose 09:00 they mean.
+  timezone: ${SONGRADAR_TIMEZONE:UTC}
   storage:
     # Root of the mounted SongRadar volume. Playlist uploads and the future music
     # library share it, so the storage page reports the same filesystem they use.

@@ -46,6 +46,9 @@ public class YtDlpTrackSource implements TrackSource {
   private static final FileAttribute<Set<PosixFilePermission>> PRIVATE_DIRECTORY =
       PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"));
 
+  /** A missing binary is a deployment state, not a per-track event, so it is said once. */
+  private volatile boolean reportedMissing;
+
   private final String executable;
   private final String ffmpegLocation;
   private final int downloadTimeoutSeconds;
@@ -93,7 +96,14 @@ public class YtDlpTrackSource implements TrackSource {
           .filter(entry -> score(entry, artist, title) >= TrackMatching.MINIMUM_SCORE)
           .map(entry -> toSourceTrack(entry, artist));
     } catch (IOException | RuntimeException exception) {
-      log.info("yt-dlp could not serve \"{} - {}\": {}", artist, title, exception.toString());
+      if (exception.getMessage() != null && exception.getMessage().contains("Cannot run program")) {
+        if (!reportedMissing) {
+          reportedMissing = true;
+          log.info("yt-dlp is not installed at \"{}\"; skipping this source", executable);
+        }
+      } else {
+        log.info("yt-dlp could not serve \"{} - {}\": {}", artist, title, exception.toString());
+      }
       return Optional.empty();
     }
   }

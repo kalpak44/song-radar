@@ -24,6 +24,13 @@ public class ListenerForm {
   @Max(value = 300, message = "Record for at most 300 seconds.")
   private int durationSeconds = 12;
 
+  /**
+   * Empty means around the clock. Validated by parsing rather than by a pattern, because the parser
+   * is what the scheduler uses and a pattern would have to agree with it for ever.
+   */
+  @Size(max = 200, message = "Use at most 200 characters.")
+  private String listenWindows = "";
+
   private boolean active = true;
 
   public static ListenerForm from(PlaylistListener listener) {
@@ -32,6 +39,7 @@ public class ListenerForm {
     form.setChannelUrl(listener.channelUrl());
     form.setIntervalMinutes(listener.recordingIntervalSeconds() / 60);
     form.setDurationSeconds(listener.recordingDurationSeconds());
+    form.setListenWindows(listener.listenWindows() == null ? "" : listener.listenWindows());
     form.setActive(listener.status() == ListenerStatus.ACTIVE);
     return form;
   }
@@ -66,6 +74,14 @@ public class ListenerForm {
 
   public void setDurationSeconds(int durationSeconds) {
     this.durationSeconds = durationSeconds;
+  }
+
+  public String getListenWindows() {
+    return listenWindows;
+  }
+
+  public void setListenWindows(String listenWindows) {
+    this.listenWindows = listenWindows;
   }
 
   public boolean isActive() {

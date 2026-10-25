@@ -12,10 +12,13 @@ public class ListenerService {
 
   private final PlaylistListenerRepository listeners;
   private final Clock clock;
+  private final ListeningSchedule schedule;
 
-  public ListenerService(PlaylistListenerRepository listeners, Clock clock) {
+  public ListenerService(
+      PlaylistListenerRepository listeners, Clock clock, ListeningSchedule schedule) {
     this.listeners = listeners;
     this.clock = clock;
+    this.schedule = schedule;
   }
 
   public List<PlaylistListener> findAll(long playlistId) {
@@ -36,9 +39,11 @@ public class ListenerService {
       PlaylistChannel channel,
       int intervalMinutes,
       int durationSeconds,
+      String listenWindows,
       boolean active) {
     Instant now = clock.instant();
     int intervalSeconds = Math.multiplyExact(intervalMinutes, 60);
+    ListenWindows windows = ListenWindows.parse(listenWindows);
     return listeners.save(
         new PlaylistListener(
             null,
@@ -48,11 +53,14 @@ public class ListenerService {
             channel.streamUrl(),
             intervalSeconds,
             durationSeconds,
+            windows.stored(),
             active ? ListenerStatus.ACTIVE : ListenerStatus.PAUSED,
             now,
             now,
             null,
-            active ? now.plusSeconds(intervalSeconds) : null));
+            active
+                ? schedule.nextOpening(windows.stored(), now.plusSeconds(intervalSeconds))
+                : null));
   }
 
   public PlaylistListener update(
@@ -61,9 +69,11 @@ public class ListenerService {
       PlaylistChannel channel,
       int intervalMinutes,
       int durationSeconds,
+      String listenWindows,
       boolean active) {
     Instant now = clock.instant();
     int intervalSeconds = Math.multiplyExact(intervalMinutes, 60);
+    ListenWindows windows = ListenWindows.parse(listenWindows);
     return listeners.save(
         new PlaylistListener(
             existing.id(),
@@ -73,11 +83,14 @@ public class ListenerService {
             channel.streamUrl(),
             intervalSeconds,
             durationSeconds,
+            windows.stored(),
             active ? ListenerStatus.ACTIVE : ListenerStatus.PAUSED,
             existing.createdAt(),
             now,
             existing.lastRecordingAt(),
-            active ? now.plusSeconds(intervalSeconds) : null));
+            active
+                ? schedule.nextOpening(windows.stored(), now.plusSeconds(intervalSeconds))
+                : null));
   }
 
   public PlaylistListener setActive(PlaylistListener existing, boolean active) {
@@ -91,11 +104,12 @@ public class ListenerService {
             existing.channelUrl(),
             existing.recordingIntervalSeconds(),
             existing.recordingDurationSeconds(),
+            existing.listenWindows(),
             active ? ListenerStatus.ACTIVE : ListenerStatus.PAUSED,
             existing.createdAt(),
             now,
             existing.lastRecordingAt(),
-            active ? now : null));
+            active ? schedule.nextOpening(existing.listenWindows(), now) : null));
   }
 
   public void delete(PlaylistListener listener) {

@@ -48,6 +48,7 @@ class ListenerViewTest {
         "https://e.com/mtv",
         180,
         12,
+        null,
         status,
         NOW.minusSeconds(3600),
         NOW,

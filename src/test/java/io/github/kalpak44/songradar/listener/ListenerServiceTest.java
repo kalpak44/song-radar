@@ -26,7 +26,9 @@ class ListenerServiceTest {
   @BeforeEach
   void setUp() {
     repository = mock(PlaylistListenerRepository.class);
-    service = new ListenerService(repository, Clock.fixed(NOW, ZoneOffset.UTC));
+    service =
+        new ListenerService(
+            repository, Clock.fixed(NOW, ZoneOffset.UTC), new ListeningSchedule("UTC"));
     when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
   }
 
@@ -39,6 +41,7 @@ class ListenerServiceTest {
             new PlaylistChannel("MTV Hits", "https://e.com/mtv"),
             3,
             12,
+            "",
             true);
 
     assertEquals("MTV Listener", listener.name());
@@ -54,7 +57,7 @@ class ListenerServiceTest {
 
     PlaylistListener updated =
         service.update(
-            existing, "Retro", new PlaylistChannel("VH1", "https://e.com/vh1"), 5, 15, false);
+            existing, "Retro", new PlaylistChannel("VH1", "https://e.com/vh1"), 5, 15, "", false);
 
     assertEquals(existing.createdAt(), updated.createdAt());
     assertEquals(existing.lastRecordingAt(), updated.lastRecordingAt());
@@ -95,6 +98,7 @@ class ListenerServiceTest {
         "https://e.com/mtv",
         180,
         12,
+        null,
         status,
         NOW.minusSeconds(3600),
         NOW.minusSeconds(120),

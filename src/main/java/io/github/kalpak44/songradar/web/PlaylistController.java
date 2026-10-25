@@ -48,6 +48,7 @@ public class PlaylistController {
   private final ListenerRecordingRepository recordings;
   private final RecordingService recordingService;
   private final ListenerScheduler scheduler;
+  private final io.github.kalpak44.songradar.listener.ListeningSchedule listeningSchedule;
   private final Path recordingsRoot;
   private final ZoneId zone;
 
@@ -59,7 +60,8 @@ public class PlaylistController {
       RecordingService recordingService,
       ListenerScheduler scheduler,
       @Value("${songradar.storage.recordings}") Path recordingsRoot,
-      Clock clock) {
+      Clock clock,
+      io.github.kalpak44.songradar.listener.ListeningSchedule listeningSchedule) {
     this.playlists = playlists;
     this.channels = channels;
     this.listeners = listeners;
@@ -68,6 +70,7 @@ public class PlaylistController {
     this.scheduler = scheduler;
     this.recordingsRoot = recordingsRoot.toAbsolutePath().normalize();
     this.zone = clock.getZone();
+    this.listeningSchedule = listeningSchedule;
   }
 
   @GetMapping("/playlists/{playlistId}")
@@ -76,6 +79,8 @@ public class PlaylistController {
     var playlistListeners = listeners.findAll(playlistId);
     model.addAttribute("activeNav", "settings");
     model.addAttribute("playlist", playlist);
+    // The windows are wall-clock, so the editor has to say whose wall.
+    model.addAttribute("listenerTimezone", listeningSchedule.zone().getId());
     model.addAttribute(
         "listeners",
         playlistListeners.stream()
@@ -152,6 +157,7 @@ public class PlaylistController {
       RedirectAttributes redirect) {
     PlaylistSource playlist = requirePlaylist(playlistId);
     PlaylistChannel channel = validate(form, binding, playlistId);
+    validateWindows(form, binding);
     if (binding.hasErrors()) {
       return renderEditor(playlist, null, form, model);
     }
@@ -162,6 +168,7 @@ public class PlaylistController {
             channel,
             form.getIntervalMinutes(),
             form.getDurationSeconds(),
+            form.getListenWindows(),
             form.isActive());
     scheduler.refresh(saved);
     redirect.addFlashAttribute(SUCCESS_MESSAGE, "Listener added.");
@@ -179,6 +186,7 @@ public class PlaylistController {
     PlaylistSource playlist = requirePlaylist(playlistId);
     PlaylistListener existing = requireListener(playlistId, listenerId);
     PlaylistChannel channel = validate(form, binding, playlistId);
+    validateWindows(form, binding);
     if (binding.hasErrors()) {
       return renderEditor(playlist, existing, form, model);
     }
@@ -189,6 +197,7 @@ public class PlaylistController {
             channel,
             form.getIntervalMinutes(),
             form.getDurationSeconds(),
+            form.getListenWindows(),
             form.isActive());
     scheduler.refresh(saved);
     redirect.addFlashAttribute(SUCCESS_MESSAGE, "Listener updated.");
@@ -223,6 +232,18 @@ public class PlaylistController {
     return redirectToPlaylist(playlistId);
   }
 
+  /**
+   * Parsed rather than pattern-matched, so the editor rejects exactly what the scheduler cannot
+   * read.
+   */
+  private void validateWindows(ListenerForm form, BindingResult binding) {
+    try {
+      io.github.kalpak44.songradar.listener.ListenWindows.parse(form.getListenWindows());
+    } catch (IllegalArgumentException exception) {
+      binding.rejectValue("listenWindows", "invalid", exception.getMessage());
+    }
+  }
+
   private PlaylistChannel validate(ListenerForm form, BindingResult binding, long playlistId) {
     if (form.getIntervalMinutes() > 0
         && form.getDurationSeconds() >= (long) form.getIntervalMinutes() * 60) {
@@ -244,6 +265,8 @@ public class PlaylistController {
       PlaylistSource playlist, PlaylistListener listener, ListenerForm form, Model model) {
     model.addAttribute("activeNav", "settings");
     model.addAttribute("playlist", playlist);
+    // The windows are wall-clock, so the editor has to say whose wall.
+    model.addAttribute("listenerTimezone", listeningSchedule.zone().getId());
     model.addAttribute("editing", listener != null);
     model.addAttribute("listenerId", listener == null ? null : listener.id());
     if (!model.containsAttribute(LISTENER_FORM)) {

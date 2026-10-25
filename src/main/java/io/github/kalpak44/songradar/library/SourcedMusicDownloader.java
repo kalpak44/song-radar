@@ -44,6 +44,13 @@ public class SourcedMusicDownloader implements MusicDownloader {
    */
   private static final long SMALLEST_TRACK_BYTES = 2_500_000;
 
+  /**
+   * How much of the length a source promised has to actually arrive. Catalogues stream a preview
+   * clip for a track they will not give away, and it downloads cleanly — the only thing that says
+   * so is the gap between the duration advertised in the search result and the audio delivered.
+   */
+  private static final double SHORTEST_ACCEPTABLE_SHARE = 0.8;
+
   private final List<TrackSource> sources;
   private final ActivityLog activity;
 
@@ -123,7 +130,7 @@ public class SourcedMusicDownloader implements MusicDownloader {
       try (OutputStream out = Files.newOutputStream(partial)) {
         track.content().writeTo(out);
       }
-      tag(playable(partial), partial, track.source(), artist, title);
+      tag(playable(partial, track.durationMillis()), partial, track.source(), artist, title);
       Files.move(
           partial, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     } finally {
@@ -135,7 +142,7 @@ public class SourcedMusicDownloader implements MusicDownloader {
    * Parses what arrived rather than trusting the transfer, so only real audio is ever filed. The
    * length check is the half that catches a stream which started correctly and then stopped.
    */
-  private static Mp3File playable(Path file) throws IOException {
+  private static Mp3File playable(Path file, long expectedMillis) throws IOException {
     long size = Files.size(file);
     if (size < SMALLEST_TRACK_BYTES) {
       throw new IOException("the download stopped after " + size / 1024 + " KB");
@@ -149,6 +156,16 @@ public class SourcedMusicDownloader implements MusicDownloader {
     if (mp3.getLengthInSeconds() < SHORTEST_TRACK_SECONDS) {
       throw new IOException(
           "the source returned only " + mp3.getLengthInSeconds() + " seconds of audio");
+    }
+    long expectedSeconds = expectedMillis / 1000;
+    if (expectedSeconds > 0
+        && mp3.getLengthInSeconds() < expectedSeconds * SHORTEST_ACCEPTABLE_SHARE) {
+      throw new IOException(
+          "the source served "
+              + mp3.getLengthInSeconds()
+              + "s of a "
+              + expectedSeconds
+              + "s track, which is a preview rather than the track");
     }
     return mp3;
   }

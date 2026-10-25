@@ -115,6 +115,7 @@ class RecordingControllerTest {
         "https://e.com/mtv",
         180,
         12,
+        null,
         ListenerStatus.ACTIVE,
         NOW,
         NOW,

@@ -13,6 +13,7 @@ public record PlaylistListener(
     String channelUrl,
     int recordingIntervalSeconds,
     int recordingDurationSeconds,
+    String listenWindows,
     ListenerStatus status,
     Instant createdAt,
     Instant updatedAt,

@@ -22,6 +22,7 @@ class ListenerFormTest {
             "https://e.com/vh1",
             300,
             15,
+            null,
             ListenerStatus.PAUSED,
             now,
             now,

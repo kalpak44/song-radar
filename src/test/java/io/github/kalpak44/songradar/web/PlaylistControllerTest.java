@@ -127,7 +127,7 @@ class PlaylistControllerTest {
   void validListenerIsCreatedScheduledAndRedirected() throws Exception {
     PlaylistListener saved = listener(ListenerStatus.ACTIVE);
     when(channels.requireChannel(4L, CHANNEL.streamUrl())).thenReturn(CHANNEL);
-    when(listeners.create(4L, "MTV Listener", CHANNEL, 3, 12, true)).thenReturn(saved);
+    when(listeners.create(4L, "MTV Listener", CHANNEL, 3, 12, "", true)).thenReturn(saved);
 
     mockMvc
         .perform(
@@ -150,7 +150,7 @@ class PlaylistControllerTest {
     PlaylistListener saved = listener(ListenerStatus.ACTIVE);
     when(listeners.find(4L, 7L)).thenReturn(Optional.of(existing));
     when(channels.requireChannel(4L, CHANNEL.streamUrl())).thenReturn(CHANNEL);
-    when(listeners.update(existing, "MTV Listener", CHANNEL, 3, 12, true)).thenReturn(saved);
+    when(listeners.update(existing, "MTV Listener", CHANNEL, 3, 12, "", true)).thenReturn(saved);
 
     mockMvc
         .perform(
@@ -190,6 +190,7 @@ class PlaylistControllerTest {
             any(),
             any(Integer.class),
             any(Integer.class),
+            any(),
             any(Boolean.class));
   }
 
@@ -362,6 +363,7 @@ class PlaylistControllerTest {
         CHANNEL.streamUrl(),
         180,
         12,
+        null,
         status,
         NOW.minusSeconds(3600),
         NOW,
@@ -388,6 +390,12 @@ class PlaylistControllerTest {
     @Bean
     Clock clock() {
       return Clock.fixed(NOW, ZoneOffset.UTC);
+    }
+
+    /** Real rather than mocked: the editor renders its zone, and a mock has none. */
+    @Bean
+    io.github.kalpak44.songradar.listener.ListeningSchedule listeningSchedule() {
+      return new io.github.kalpak44.songradar.listener.ListeningSchedule("UTC");
     }
   }
 }

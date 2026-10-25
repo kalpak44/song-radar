@@ -32,7 +32,7 @@ All environment variables, defaulted for local development in `.env.example`:
 `SONGRADAR_DB_HOST`, `SONGRADAR_DB_PORT`, `SONGRADAR_DB_NAME`, `SONGRADAR_DB_USERNAME`,
 `SONGRADAR_DB_PASSWORD`, `SONGRADAR_PORT`, `SONGRADAR_TEMPLATE_CACHE`, and
 `SONGRADAR_STORAGE_PATH`, `SONGRADAR_STORAGE_LIBRARY`, `SONGRADAR_STORAGE_CAPACITY_GB`,
-`SONGRADAR_LISTENER_THREADS`, and the optional `SONGRADAR_AUDD_API_TOKEN`.
+`SONGRADAR_LISTENER_THREADS`, `SONGRADAR_TIMEZONE`, and the optional `SONGRADAR_AUDD_API_TOKEN`.
 
 `SONGRADAR_DB_PASSWORD` has no default — a fallback password is one that reaches production unnoticed.
 `SONGRADAR_STORAGE_PATH` points at the writable mounted volume. `SONGRADAR_STORAGE_LIBRARY`
@@ -41,6 +41,9 @@ overrides where downloaded tracks are filed — one subfolder per listener — a
 for the cluster; `.env.example` selects `./data` for local development.
 `SONGRADAR_STORAGE_CAPACITY_GB` optionally supplies a logical capacity for storage such as NFS,
 where filesystem statistics describe the whole server rather than the application's volume.
+`SONGRADAR_TIMEZONE` is the zone a listener's listening windows are read in — they are written as
+wall-clock times and the application itself runs on UTC, so a window means nothing without it.
+
 `SONGRADAR_LISTENER_THREADS` controls how many different listeners may record concurrently. A
 single listener always waits for its current recording to finish before scheduling its next one.
 `SONGRADAR_RECOGNITION_THREADS` controls the separate background recognition worker pool.

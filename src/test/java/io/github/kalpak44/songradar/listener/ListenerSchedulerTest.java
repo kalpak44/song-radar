@@ -38,7 +38,11 @@ class ListenerSchedulerTest {
     doReturn(future).when(taskScheduler).schedule(any(Runnable.class), any(Instant.class));
     scheduler =
         new ListenerScheduler(
-            taskScheduler, listeners, recordings, Clock.fixed(NOW, ZoneOffset.UTC));
+            taskScheduler,
+            listeners,
+            recordings,
+            Clock.fixed(NOW, ZoneOffset.UTC),
+            new ListeningSchedule("UTC"));
   }
 
   @Test
@@ -86,6 +90,7 @@ class ListenerSchedulerTest {
         "https://e.com/mtv",
         180,
         12,
+        null,
         status,
         NOW.minusSeconds(3600),
         NOW,
