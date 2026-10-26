@@ -6,13 +6,13 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
@@ -37,6 +37,7 @@ public class ShazamRecognitionClient implements RecognitionClient {
 
   private static final String DEFAULT_ENDPOINT = "https://amp.shazam.com";
   private static final String TIMEZONE = "Europe/Paris";
+  private static final SecureRandom RANDOM = new SecureRandom();
 
   /**
    * The app identifies as a handful of old Android builds. Varying it per request mirrors the
@@ -109,9 +110,7 @@ public class ShazamRecognitionClient implements RecognitionClient {
             .uri(URI.create(tagUrl()))
             .contentType(MediaType.APPLICATION_JSON)
             .header("Content-Language", "en_US")
-            .header(
-                "User-Agent",
-                USER_AGENTS.get(ThreadLocalRandom.current().nextInt(USER_AGENTS.size())))
+            .header("User-Agent", USER_AGENTS.get(RANDOM.nextInt(USER_AGENTS.size())))
             .body(
                 new TagRequest(
                     new Geolocation(300, 45, 2),
