@@ -1,6 +1,7 @@
 package io.github.kalpak44.songradar.activity;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -68,7 +69,9 @@ class ActivityServiceTest {
   void swallowsAFailureToWrite() {
     when(events.save(any())).thenThrow(new IllegalStateException("database is away"));
 
-    service.record(ActivityKind.SAVED, "Radio One", "A track", "Audius", null);
+    assertThatNoException()
+        .isThrownBy(
+            () -> service.record(ActivityKind.SAVED, "Radio One", "A track", "Audius", null));
   }
 
   @Test

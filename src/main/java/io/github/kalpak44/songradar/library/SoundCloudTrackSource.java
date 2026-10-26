@@ -48,9 +48,9 @@ public class SoundCloudTrackSource implements TrackSource {
    */
   private static final String ADVERTISED_BUT_NOT_SERVED = "abr_sq";
 
-  private final String api;
-  private final String site;
-  private final Pattern asset;
+  private final String apiBase;
+  private final String siteBase;
+  private final Pattern assetPattern;
   private final RestClient client;
   private volatile String clientId;
 
@@ -58,10 +58,10 @@ public class SoundCloudTrackSource implements TrackSource {
     this(API, SITE, ASSET);
   }
 
-  SoundCloudTrackSource(String api, String site, Pattern asset) {
-    this.api = api;
-    this.site = site;
-    this.asset = asset;
+  SoundCloudTrackSource(String apiBase, String siteBase, Pattern assetPattern) {
+    this.apiBase = apiBase;
+    this.siteBase = siteBase;
+    this.assetPattern = assetPattern;
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout(Duration.ofSeconds(10));
     requestFactory.setReadTimeout(Duration.ofSeconds(60));
@@ -101,7 +101,7 @@ public class SoundCloudTrackSource implements TrackSource {
               // The query goes in as a URI variable so the client encodes it once, correctly.
               // Encoded by hand into the string it is encoded a second time, and a Cyrillic title
               // then answers with unrelated uploads rather than with nothing.
-              .uri(api + "/search/tracks?q={q}&limit=10&client_id={id}", query, id)
+              .uri(apiBase + "/search/tracks?q={q}&limit=10&client_id={id}", query, id)
               .retrieve()
               .body(SearchResponse.class);
     } catch (RuntimeException exception) {
@@ -275,7 +275,7 @@ public class SoundCloudTrackSource implements TrackSource {
     if (cached != null) {
       return cached;
     }
-    Matcher assets = asset.matcher(text(site));
+    Matcher assets = assetPattern.matcher(text(siteBase));
     List<String> scripts = new ArrayList<>();
     while (assets.find()) {
       scripts.add(assets.group());

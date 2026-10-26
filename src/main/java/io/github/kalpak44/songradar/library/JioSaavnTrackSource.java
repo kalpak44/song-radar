@@ -49,15 +49,15 @@ public class JioSaavnTrackSource implements TrackSource {
    */
   private static final ObjectMapper JSON = JsonMapper.builder().build();
 
-  private final String api;
+  private final String apiBase;
   private final RestClient client;
 
   public JioSaavnTrackSource() {
     this(API);
   }
 
-  JioSaavnTrackSource(String api) {
-    this.api = api;
+  JioSaavnTrackSource(String apiBase) {
+    this.apiBase = apiBase;
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout(Duration.ofSeconds(10));
     requestFactory.setReadTimeout(Duration.ofSeconds(60));
@@ -99,11 +99,11 @@ public class JioSaavnTrackSource implements TrackSource {
 
   private String search(String artist, String title) {
     String query = URLEncoder.encode((artist + " " + title).trim(), StandardCharsets.UTF_8);
-    return api + SEARCH + query;
+    return apiBase + SEARCH + query;
   }
 
   private String detailsUrl(String id) {
-    return api + DETAILS + id;
+    return apiBase + DETAILS + id;
   }
 
   private String text(String url) {
@@ -142,7 +142,7 @@ public class JioSaavnTrackSource implements TrackSource {
       throw new IllegalStateException("the track has no media path");
     }
     String encoded = URLEncoder.encode(details.encrypted_media_path(), StandardCharsets.UTF_8);
-    AuthToken token = JSON.readValue(text(api + AUTH + encoded), AuthToken.class);
+    AuthToken token = JSON.readValue(text(apiBase + AUTH + encoded), AuthToken.class);
     if (token == null || token.auth_url() == null || token.auth_url().isBlank()) {
       throw new IllegalStateException("the track's media URL could not be authorised");
     }
