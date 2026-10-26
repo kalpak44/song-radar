@@ -40,7 +40,7 @@ class SoundDetectionServiceTest {
   private ListenerRecordingRepository recordings;
   private PlaylistListenerRepository listeners;
   private MusicDownloader downloader;
-  private AuddRecognitionClient recognition;
+  private RecognitionClient recognition;
   private TaskExecutor executor;
   private SoundDetectionService service;
 
@@ -51,7 +51,9 @@ class SoundDetectionServiceTest {
     recordings = mock(ListenerRecordingRepository.class);
     listeners = mock(PlaylistListenerRepository.class);
     downloader = mock(MusicDownloader.class);
-    recognition = mock(AuddRecognitionClient.class);
+    recognition = mock(RecognitionClient.class);
+    when(recognition.name()).thenReturn("AudD");
+    when(recognition.unavailableReason()).thenReturn("Recognition is switched off.");
     executor = mock(TaskExecutor.class);
     service =
         new SoundDetectionService(
@@ -254,7 +256,7 @@ class SoundDetectionServiceTest {
     ArgumentCaptor<SoundDetection> saved = ArgumentCaptor.forClass(SoundDetection.class);
     verify(detections).save(saved.capture());
     assertThat(saved.getValue().status()).isEqualTo(DetectionStatus.UNAVAILABLE);
-    assertThat(saved.getValue().errorMessage()).contains("SONGRADAR_AUDD_API_TOKEN");
+    assertThat(saved.getValue().errorMessage()).isEqualTo("Recognition is switched off.");
     assertThat(saved.getValue().detectedAt()).isEqualTo(NOW);
     verify(executor, never()).execute(any(Runnable.class));
   }
@@ -309,7 +311,7 @@ class SoundDetectionServiceTest {
     ArgumentCaptor<SoundDetection> saved = ArgumentCaptor.forClass(SoundDetection.class);
     verify(detections).save(saved.capture());
     assertThat(saved.getValue().status()).isEqualTo(DetectionStatus.UNAVAILABLE);
-    assertThat(saved.getValue().errorMessage()).contains("SONGRADAR_AUDD_API_TOKEN");
+    assertThat(saved.getValue().errorMessage()).isEqualTo("Recognition is switched off.");
     verify(executor, never()).execute(any(Runnable.class));
   }
 

@@ -1,7 +1,10 @@
 package io.github.kalpak44.songradar.web;
 
+import io.github.kalpak44.songradar.detection.RecognitionProvider;
+import io.github.kalpak44.songradar.detection.RecognitionProviders;
 import io.github.kalpak44.songradar.playlist.PlaylistSourceService;
 import io.github.kalpak44.songradar.web.form.AddUrlForm;
+import io.github.kalpak44.songradar.web.form.RecognitionProviderForm;
 import jakarta.validation.Valid;
 import java.io.UncheckedIOException;
 import java.time.Clock;
@@ -27,16 +30,20 @@ public class SettingsController {
 
   private static final String REDIRECT_SETTINGS = "redirect:/settings";
   private static final String ADD_URL_FORM = "addUrlForm";
+  private static final String RECOGNITION_FORM = "recognitionProviderForm";
   private static final String SUCCESS_MESSAGE = "successMessage";
   private static final String ERROR_MESSAGE = "errorMessage";
   private static final String BINDING_RESULT_ADD_URL_FORM =
       "org.springframework.validation.BindingResult." + ADD_URL_FORM;
 
   private final PlaylistSourceService service;
+  private final RecognitionProviders recognition;
   private final ZoneId zone;
 
-  public SettingsController(PlaylistSourceService service, Clock clock) {
+  public SettingsController(
+      PlaylistSourceService service, RecognitionProviders recognition, Clock clock) {
     this.service = service;
+    this.recognition = recognition;
     this.zone = clock.getZone();
   }
 
@@ -47,7 +54,42 @@ public class SettingsController {
     if (!model.containsAttribute(ADD_URL_FORM)) {
       model.addAttribute(ADD_URL_FORM, new AddUrlForm());
     }
+    try {
+      model.addAttribute("recognitionProviders", RecognitionProviderView.of(recognition));
+      if (!model.containsAttribute(RECOGNITION_FORM)) {
+        RecognitionProviderForm form = new RecognitionProviderForm();
+        form.setProvider(recognition.active().id());
+        model.addAttribute(RECOGNITION_FORM, form);
+      }
+    } catch (DataAccessException _) {
+      model.addAttribute(
+          "recognitionError", "Recognition settings are temporarily unavailable. Try again.");
+    }
     return "settings";
+  }
+
+  @PostMapping("/settings/recognition")
+  public String selectRecognitionProvider(
+      @ModelAttribute(RECOGNITION_FORM) RecognitionProviderForm form, RedirectAttributes redirect) {
+    try {
+      RecognitionProvider provider = RecognitionProvider.of(form.getProvider());
+      recognition.select(provider);
+      if (recognition.isConfigured(provider)) {
+        redirect.addFlashAttribute(
+            SUCCESS_MESSAGE, "New recordings are now identified with " + provider.label() + ".");
+      } else {
+        // Saved regardless: refusing the choice would hide it, and the page already says why
+        // the provider cannot run yet.
+        redirect.addFlashAttribute(
+            ERROR_MESSAGE, provider.label() + " is selected but not ready to use.");
+      }
+    } catch (IllegalArgumentException _) {
+      redirect.addFlashAttribute(ERROR_MESSAGE, "That recognition provider does not exist.");
+    } catch (DataAccessException _) {
+      redirect.addFlashAttribute(
+          ERROR_MESSAGE, "The recognition provider could not be saved. Try again.");
+    }
+    return REDIRECT_SETTINGS;
   }
 
   @PostMapping("/settings/sources/url")

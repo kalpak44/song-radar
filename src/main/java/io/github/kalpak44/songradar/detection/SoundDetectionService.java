@@ -30,7 +30,6 @@ import org.springframework.stereotype.Service;
 public class SoundDetectionService {
 
   private static final Logger log = LoggerFactory.getLogger(SoundDetectionService.class);
-  private static final String PROVIDER = "AudD";
 
   private final Path root;
   private final Path libraryRoot;
@@ -39,7 +38,7 @@ public class SoundDetectionService {
   private final ListenerRecordingRepository recordings;
   private final PlaylistListenerRepository listeners;
   private final MusicDownloader downloader;
-  private final AuddRecognitionClient recognition;
+  private final RecognitionClient recognition;
   private final ActivityLog activity;
   private final TaskExecutor executor;
   private final Clock clock;
@@ -52,7 +51,7 @@ public class SoundDetectionService {
       ListenerRecordingRepository recordings,
       PlaylistListenerRepository listeners,
       MusicDownloader downloader,
-      AuddRecognitionClient recognition,
+      RecognitionClient recognition,
       @Qualifier("recognitionTaskExecutor") TaskExecutor executor,
       Clock clock,
       ActivityLog activity) {
@@ -87,7 +86,7 @@ public class SoundDetectionService {
                   null,
                   null,
                   detection.detectionCount(),
-                  "Recognition is disabled. Set SONGRADAR_AUDD_API_TOKEN to enable it."));
+                  recognition.unavailableReason()));
     }
   }
 
@@ -108,7 +107,7 @@ public class SoundDetectionService {
                 null,
                 recording.id(),
                 status,
-                PROVIDER,
+                recognition.name(),
                 null,
                 null,
                 null,
@@ -118,9 +117,7 @@ public class SoundDetectionService {
                 clock.instant(),
                 clock.instant(),
                 1,
-                status == DetectionStatus.UNAVAILABLE
-                    ? "Recognition is disabled. Set SONGRADAR_AUDD_API_TOKEN to enable it."
-                    : null,
+                status == DetectionStatus.UNAVAILABLE ? recognition.unavailableReason() : null,
                 listenerNameForRecording(recording)));
     if (status == DetectionStatus.PENDING) {
       schedule(saved);
@@ -145,7 +142,7 @@ public class SoundDetectionService {
                 null,
                 recording.id(),
                 DetectionStatus.PENDING,
-                PROVIDER,
+                recognition.name(),
                 null,
                 null,
                 null,
@@ -193,7 +190,7 @@ public class SoundDetectionService {
             ActivityKind.NOT_IDENTIFIED,
             listenerNameFor(detection),
             null,
-            PROVIDER,
+            recognition.name(),
             "No track recognised in this recording");
       } else {
         saveMatched(detection, result);
@@ -227,7 +224,7 @@ public class SoundDetectionService {
               current.id(),
               pending.recordingId(),
               DetectionStatus.MATCHED,
-              PROVIDER,
+              recognition.name(),
               key,
               first(result.get("title"), current.title()),
               first(result.get("artist"), current.artist()),
@@ -247,7 +244,7 @@ public class SoundDetectionService {
             pending.id(),
             pending.recordingId(),
             DetectionStatus.MATCHED,
-            PROVIDER,
+            recognition.name(),
             key,
             title,
             artist,
@@ -272,7 +269,7 @@ public class SoundDetectionService {
         ActivityKind.DETECTED,
         listenerName,
         trackOf(detection),
-        PROVIDER,
+        recognition.name(),
         "Identified from a recording");
     downloader.download(detection, libraryRoot.resolve(safeFolderName(listenerName)));
     discardRecording(detection.recordingId());
@@ -364,7 +361,7 @@ public class SoundDetectionService {
             current.id(),
             current.recordingId(),
             status,
-            PROVIDER,
+            recognition.name(),
             key,
             title,
             artist,

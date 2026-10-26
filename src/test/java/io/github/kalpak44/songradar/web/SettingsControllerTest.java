@@ -1,7 +1,11 @@
 package io.github.kalpak44.songradar.web;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasProperty;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,12 +18,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.view;
 
+import io.github.kalpak44.songradar.detection.RecognitionProvider;
+import io.github.kalpak44.songradar.detection.RecognitionProviders;
 import io.github.kalpak44.songradar.playlist.PlaylistSource;
 import io.github.kalpak44.songradar.playlist.PlaylistSourceService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -39,6 +46,13 @@ class SettingsControllerTest {
 
   @Autowired private MockMvc mockMvc;
   @MockitoBean private PlaylistSourceService service;
+  @MockitoBean private RecognitionProviders recognition;
+
+  @BeforeEach
+  void selectAProvider() {
+    when(recognition.active()).thenReturn(RecognitionProvider.AUDD);
+    when(recognition.isConfigured(any(RecognitionProvider.class))).thenReturn(true);
+  }
 
   @Test
   void settingsRendersSourcesAndMarksNavigationActive() throws Exception {
@@ -222,5 +236,89 @@ class SettingsControllerTest {
     Clock clock() {
       return Clock.fixed(NOW, ZoneOffset.UTC);
     }
+  }
+
+  @Test
+  void theSettingsPageListsEveryProviderAndMarksTheActiveOne() throws Exception {
+    when(recognition.active()).thenReturn(RecognitionProvider.SHAZAM);
+
+    mockMvc
+        .perform(get("/settings"))
+        .andExpect(status().isOk())
+        .andExpect(model().attribute("recognitionProviders", hasSize(3)))
+        // The bound form is what preselects a radio, so that is where the active provider shows.
+        .andExpect(
+            model()
+                .attribute("recognitionProviderForm", hasProperty("provider", equalTo("shazam"))))
+        .andExpect(content().string(containsString("Track recognition")))
+        .andExpect(content().string(containsString("value=\"audd\"")))
+        .andExpect(content().string(containsString("value=\"shazam\"")))
+        .andExpect(content().string(containsString("value=\"none\"")));
+  }
+
+  @Test
+  void aProviderThatIsNotReadyIsLabelledOnThePage() throws Exception {
+    when(recognition.isConfigured(RecognitionProvider.AUDD)).thenReturn(false);
+
+    mockMvc
+        .perform(get("/settings"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("SONGRADAR_AUDD_API_TOKEN")));
+  }
+
+  @Test
+  void choosingAProviderSavesItAndSaysSo() throws Exception {
+    mockMvc
+        .perform(post("/settings/recognition").param("provider", "shazam"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/settings"))
+        .andExpect(flash().attribute("successMessage", containsString("Shazam")));
+
+    verify(recognition).select(RecognitionProvider.SHAZAM);
+  }
+
+  /** Saved even so: hiding the choice would leave the page disagreeing with the database. */
+  @Test
+  void choosingAProviderThatIsNotReadyStillSavesItAndWarns() throws Exception {
+    when(recognition.isConfigured(RecognitionProvider.AUDD)).thenReturn(false);
+
+    mockMvc
+        .perform(post("/settings/recognition").param("provider", "audd"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(flash().attribute("errorMessage", containsString("not ready to use")));
+
+    verify(recognition).select(RecognitionProvider.AUDD);
+  }
+
+  @Test
+  void anUnknownProviderIsRejectedWithoutSavingAnything() throws Exception {
+    mockMvc
+        .perform(post("/settings/recognition").param("provider", "acrcloud"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(flash().attribute("errorMessage", containsString("does not exist")));
+
+    verify(recognition, never()).select(any(RecognitionProvider.class));
+  }
+
+  @Test
+  void aDatabaseFailureReportsTheProviderAsUnavailableRatherThanBreakingThePage() throws Exception {
+    when(recognition.active()).thenThrow(new DataAccessResourceFailureException("down"));
+
+    mockMvc
+        .perform(get("/settings"))
+        .andExpect(status().isOk())
+        .andExpect(model().attributeExists("recognitionError"));
+  }
+
+  @Test
+  void savingReportsADatabaseFailure() throws Exception {
+    org.mockito.Mockito.doThrow(new DataAccessResourceFailureException("down"))
+        .when(recognition)
+        .select(any(RecognitionProvider.class));
+
+    mockMvc
+        .perform(post("/settings/recognition").param("provider", "shazam"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(flash().attribute("errorMessage", containsString("could not be saved")));
   }
 }

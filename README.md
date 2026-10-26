@@ -47,10 +47,28 @@ wall-clock times and the application itself runs on UTC, so a window means nothi
 `SONGRADAR_LISTENER_THREADS` controls how many different listeners may record concurrently. A
 single listener always waits for its current recording to finish before scheduling its next one.
 `SONGRADAR_RECOGNITION_THREADS` controls the separate background recognition worker pool.
-Set `SONGRADAR_AUDD_API_TOKEN` to enable automatic song recognition for new WAV recordings. The
-Sound detections page groups repeated matches by normalized artist and title. Without a token,
-recordings are still saved and listed as recognition unavailable. AudD currently offers a limited
-free trial; ongoing usage may require a paid plan.
+Track recognition is chosen on the Settings page, not in the environment: pick AudD, Shazam or
+Disabled, and the choice applies to the next recording rather than the next restart. The Sound
+detections page groups repeated matches by normalized artist and title. While recognition is
+disabled, recordings are still captured and listed as recognition unavailable.
+
+AudD uploads each recording to the AudD API and needs `SONGRADAR_AUDD_API_TOKEN`; selecting it
+without one leaves recordings unidentified and says so. The free trial is 300 requests in total,
+which a listener capturing every few minutes spends in well under a day, after which every
+recognition fails until the plan is paid for.
+
+Shazam needs no account, no token and has no quota. SongRadar fingerprints the capture itself and
+sends only its spectral peaks — never the audio — to the endpoint Shazam's own Android app uses.
+That endpoint is undocumented and carries no contract: it can change without notice, in which case
+recognition starts failing on an unparseable response rather than a stated error, and Shazam
+throttles by source address, so one capture every few minutes is fine where a burst is not.
+`ShazamRecognitionAvailabilityTest` recognises real recordings against the live service and is the
+check for whether the client still works:
+
+```bash
+./mvnw test -Dtest=ShazamRecognitionAvailabilityTest -Dexcluded.test.groups= \
+    -Dsongradar.recordings=./data/recordings
+```
 
 ## Checks
 

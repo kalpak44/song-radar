@@ -4,22 +4,19 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
-@Component
-public class AuddRecognitionClient {
+public class AuddRecognitionClient implements RecognitionClient {
 
   private final String token;
   private final RestClient client;
 
-  public AuddRecognitionClient(@Value("${songradar.recognition.audd.api-token:}") String token) {
+  public AuddRecognitionClient(String token) {
     this.token = token == null ? "" : token.trim();
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout(Duration.ofSeconds(10));
@@ -27,10 +24,22 @@ public class AuddRecognitionClient {
     this.client = RestClient.builder().requestFactory(requestFactory).build();
   }
 
+  @Override
+  public String name() {
+    return "AudD";
+  }
+
+  @Override
   public boolean isConfigured() {
     return !token.isBlank();
   }
 
+  @Override
+  public String unavailableReason() {
+    return "AudD is selected but SONGRADAR_AUDD_API_TOKEN is not set.";
+  }
+
+  @Override
   public Map<String, String> recognize(Path file) {
     MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
     body.add("api_token", token);
@@ -45,8 +54,7 @@ public class AuddRecognitionClient {
             .retrieve()
             .body(AuddResponse.class);
     if (response == null || !"success".equalsIgnoreCase(response.status())) {
-      throw new IllegalStateException(
-          "The recognition provider returned an unsuccessful response.");
+      throw new IllegalStateException(describe(response));
     }
     if (response.result() == null) {
       return Map.of();
@@ -60,7 +68,22 @@ public class AuddRecognitionClient {
     return result;
   }
 
-  private record AuddResponse(String status, AuddResult result) {}
+  /**
+   * AudD answers with HTTP 200 and an error object, so the reason a request failed — an exhausted
+   * quota (901/902) reads nothing like a bad token — is only visible if we repeat it. Without this
+   * the detection row and the log line say the same opaque thing for every cause.
+   */
+  private static String describe(AuddResponse response) {
+    if (response == null || response.error() == null) {
+      return "The recognition provider returned an unsuccessful response.";
+    }
+    return "The recognition provider returned error %d: %s"
+        .formatted(response.error().error_code(), response.error().error_message());
+  }
+
+  private record AuddResponse(String status, AuddResult result, AuddError error) {}
+
+  private record AuddError(int error_code, String error_message) {}
 
   private record AuddResult(
       String title, String artist, String album, String release_date, String song_link) {}
