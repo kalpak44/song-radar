@@ -13,11 +13,20 @@ import org.springframework.web.client.RestClient;
 
 public class AuddRecognitionClient implements RecognitionClient {
 
+  private static final String DEFAULT_ENDPOINT = "https://api.audd.io/";
+
   private final String token;
+  private final String endpoint;
   private final RestClient client;
 
   public AuddRecognitionClient(String token) {
+    this(token, DEFAULT_ENDPOINT);
+  }
+
+  /** The endpoint is overridable only so tests can answer in AudD's place. */
+  public AuddRecognitionClient(String token, String endpoint) {
     this.token = token == null ? "" : token.trim();
+    this.endpoint = endpoint == null || endpoint.isBlank() ? DEFAULT_ENDPOINT : endpoint.trim();
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
     requestFactory.setConnectTimeout(Duration.ofSeconds(10));
     requestFactory.setReadTimeout(Duration.ofSeconds(30));
@@ -48,7 +57,7 @@ public class AuddRecognitionClient implements RecognitionClient {
     AuddResponse response =
         client
             .post()
-            .uri("https://api.audd.io/")
+            .uri(java.net.URI.create(endpoint))
             .contentType(MediaType.MULTIPART_FORM_DATA)
             .body(body)
             .retrieve()

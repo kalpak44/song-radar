@@ -2,7 +2,6 @@ package io.github.kalpak44.songradar.config;
 
 import io.github.kalpak44.songradar.detection.AuddRecognitionClient;
 import io.github.kalpak44.songradar.detection.DisabledRecognitionClient;
-import io.github.kalpak44.songradar.detection.RecognitionClient;
 import io.github.kalpak44.songradar.detection.RecognitionProvider;
 import io.github.kalpak44.songradar.detection.RecognitionProviders;
 import io.github.kalpak44.songradar.detection.RecognitionSettingsRepository;
@@ -20,6 +19,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RecognitionConfiguration {
 
+  /**
+   * One bean, deliberately typed as the concrete class: it is both the {@link
+   * io.github.kalpak44.songradar.detection.RecognitionClient} the detection service consumes and
+   * the provider registry the settings page reads, and a second bean aliasing it would make every
+   * lookup of this type ambiguous.
+   */
   @Bean
   RecognitionProviders recognitionProviders(
       RecognitionSettingsRepository settings,
@@ -30,10 +35,5 @@ public class RecognitionConfiguration {
             RecognitionProvider.AUDD, new AuddRecognitionClient(auddApiToken),
             RecognitionProvider.SHAZAM, new ShazamRecognitionClient(),
             RecognitionProvider.NONE, new DisabledRecognitionClient()));
-  }
-
-  @Bean
-  RecognitionClient recognitionClient(RecognitionProviders providers) {
-    return providers;
   }
 }

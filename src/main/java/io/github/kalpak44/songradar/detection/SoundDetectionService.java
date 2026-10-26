@@ -51,7 +51,7 @@ public class SoundDetectionService {
       ListenerRecordingRepository recordings,
       PlaylistListenerRepository listeners,
       MusicDownloader downloader,
-      @Qualifier("recognitionClient") RecognitionClient recognition,
+      RecognitionClient recognition,
       @Qualifier("recognitionTaskExecutor") TaskExecutor executor,
       Clock clock,
       ActivityLog activity) {
