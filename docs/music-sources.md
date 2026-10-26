@@ -56,6 +56,19 @@ container fixup before anything can decode it — with `--fixup never` the file 
 project's parser *and* by CoreAudio. Since ffmpeg has to be installed beside yt-dlp anyway, yt-dlp
 extracts the MP3 itself rather than handing AAC to the transcoder here.
 
+**The image ships both binaries, so nothing has to be installed around it.** `pom.xml` pins
+`ytdlp.version` and `ffmpeg.version` with the checksums their publishers state, and
+download-maven-plugin fetches them at `prepare-package` into `/usr/local/bin`, which jib copies into
+the image and marks executable. That directory is already on `PATH`, so the application finds
+`yt-dlp` under its default configuration and yt-dlp finds ffmpeg without `--ffmpeg-location`. Two
+details are easy to get wrong: the base image is Alpine, so it needs the **musl** build of yt-dlp —
+`yt-dlp_linux` is glibc and will not start — and yt-dlp is a self-extracting bundle, so the
+directory it unpacks into must allow execution. `readOnlyRootFilesystem` is fine because the
+Deployment mounts an `emptyDir` at `/tmp`; a `noexec` mount there is not, and it fails as
+`Error loading shared library libz.so.1: Operation not permitted`, which reads like a missing
+library rather than a mount option. ffprobe is not bundled: it costs 80 MB and audio extraction was
+measured to work without it.
+
 **A yt-dlp that is months old fails in a way that reads as a bug here.** Measured: version
 2026.03.17 lists formats and reports metadata perfectly, then fails the media download with
 `HTTP Error 403`. 2026.10.21 downloads the same track in about eleven seconds. Pin a recent build

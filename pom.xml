@@ -30,6 +30,24 @@
         <jacoco.plugin.version>0.8.15</jacoco.plugin.version>
         <sonar.plugin.version>5.8.0.7211</sonar.plugin.version>
         <jib.plugin.version>3.5.2</jib.plugin.version>
+        <download.plugin.version>1.10.0</download.plugin.version>
+
+        <!-- Bundled into the image by jib below. yt-dlp needs the musl build, not the
+             usual yt-dlp_linux: the base image is Alpine and the glibc binary will not
+             start there. ffmpeg is not optional company for it — the YouTube source runs
+             yt-dlp with audio extraction, which is ffmpeg's job, so a yt-dlp shipped on
+             its own downloads the audio and then fails to convert it. Both are amd64,
+             matching the platform jib builds for. Checksums are the ones the publishers
+             state; a changed version needs its checksum changed with it or the build
+             stops. -->
+        <ytdlp.version>2026.10.21</ytdlp.version>
+        <ytdlp.sha256>d39487ff5c8eb1254d6f142bea05f495440d87ff529b2df786dcd3b5f66b23a8</ytdlp.sha256>
+        <!-- Tagged b6.1.1 by its publisher but is in fact the 7.0.2 static build, offered
+             as one file so the build needs no unpacking step. ffprobe is deliberately not
+             bundled: it would add 80 MB and audio extraction was verified to work
+             without it. -->
+        <ffmpeg.version>b6.1.1</ffmpeg.version>
+        <ffmpeg.sha256>e7e7fb30477f717e6f55f9180a70386c62677ef8a4d4d1a5d948f4098aa3eb99</ffmpeg.sha256>
 
         <!-- The source checks reach the real music catalogues, so they are held out of the
              normal build and run on their own schedule. -->
@@ -210,6 +228,43 @@
             <!-- Builds the container image from target/classes with no Dockerfile, which
                  is why dependabot.yml has no `docker` entry: the base image is pinned
                  here and moves as a Maven property. -->
+            <!-- Fetches the two binaries the image ships. Bound to prepare-package so a
+                 plain `mvn test` does not pull 120 MB, and cached under ~/.m2 so CI pulls
+                 them once rather than once per run. -->
+            <plugin>
+                <groupId>com.googlecode.maven-download-plugin</groupId>
+                <artifactId>download-maven-plugin</artifactId>
+                <version>${download.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>fetch-yt-dlp</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <uri>https://github.com/yt-dlp/yt-dlp/releases/download/${ytdlp.version}/yt-dlp_musllinux</uri>
+                            <outputDirectory>${project.build.directory}/jib-extra/usr/local/bin</outputDirectory>
+                            <outputFileName>yt-dlp</outputFileName>
+                            <sha256>${ytdlp.sha256}</sha256>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>fetch-ffmpeg</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <uri>https://github.com/eugeneware/ffmpeg-static/releases/download/${ffmpeg.version}/ffmpeg-linux-x64</uri>
+                            <outputDirectory>${project.build.directory}/jib-extra/usr/local/bin</outputDirectory>
+                            <outputFileName>ffmpeg</outputFileName>
+                            <sha256>${ffmpeg.sha256}</sha256>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <plugin>
                 <groupId>com.google.cloud.tools</groupId>
                 <artifactId>jib-maven-plugin</artifactId>
@@ -221,7 +276,38 @@
                              lags those rebuilds, and the scan reports the difference as
                              fixable Critical findings in OpenSSL and expat. -->
                         <image>azul/zulu-openjdk-alpine:25-jre-headless</image>
+                        <!-- Stated rather than inherited: the yt-dlp and ffmpeg binaries
+                             below are amd64, so a build for another architecture would
+                             produce an image whose YouTube source cannot start. -->
+                        <platforms>
+                            <platform>
+                                <architecture>amd64</architecture>
+                                <os>linux</os>
+                            </platform>
+                        </platforms>
                     </from>
+                    <!-- /usr/local/bin is already on PATH, so yt-dlp finds ffmpeg and the
+                         application finds yt-dlp under its default configuration. The
+                         files are put there by download-maven-plugin at prepare-package;
+                         `mvn package` is what fills this directory. -->
+                    <extraDirectories>
+                        <paths>
+                            <path>
+                                <from>${project.build.directory}/jib-extra</from>
+                                <into>/</into>
+                            </path>
+                        </paths>
+                        <permissions>
+                            <permission>
+                                <file>/usr/local/bin/yt-dlp</file>
+                                <mode>755</mode>
+                            </permission>
+                            <permission>
+                                <file>/usr/local/bin/ffmpeg</file>
+                                <mode>755</mode>
+                            </permission>
+                        </permissions>
+                    </extraDirectories>
                     <container>
                         <mainClass>io.github.kalpak44.songradar.SongRadarApplication</mainClass>
                         <ports>
