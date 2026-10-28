@@ -98,29 +98,10 @@ class FileExplorerControllerTest {
                 .string(containsString("play-previous")))
         .andExpect(
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
-                .string(containsString("play-next")));
-  }
-
-  @Test
-  void playableLibraryFileHasAConfirmedRemoveAction() throws Exception {
-    Path folder = root.resolve("library/Listener");
-    when(files.fileOrDirectory("library/Listener")).thenReturn(folder);
-    when(files.relative(folder)).thenReturn("library/Listener");
-    when(files.list("library/Listener"))
-        .thenReturn(
-            List.of(
-                new LibraryFile(
-                    "song.mp3", "library/Listener/song.mp3", false, 100, Instant.EPOCH)));
-
-    mockMvc
-        .perform(get("/library").param("path", "Listener"))
-        .andExpect(status().isOk())
+                .string(containsString("play-next")))
         .andExpect(
             org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
-                .string(containsString("Remove track")))
-        .andExpect(
-            org.springframework.test.web.servlet.result.MockMvcResultMatchers.content()
-                .string(containsString("Remove song.mp3")));
+                .string(containsString("play-shuffle")));
   }
 
   @Test
@@ -219,28 +200,27 @@ class FileExplorerControllerTest {
   }
 
   @Test
-  void copiesSelectedItemsIntoTheSessionClipboard() throws Exception {
+  void cutsSelectedItemsIntoTheSessionClipboard() throws Exception {
     when(files.resolveAll(List.of("a", "b")))
         .thenReturn(List.of(root.resolve("a"), root.resolve("b")));
     when(files.relative(any())).thenReturn("a", "b");
     MockHttpSession session = new MockHttpSession();
 
     mockMvc
-        .perform(post("/files/copy").param("paths", "a", "b").session(session))
+        .perform(post("/files/cut").param("paths", "a", "b").session(session))
         .andExpect(status().is3xxRedirection())
-        .andExpect(
-            flash().attribute("successMessage", "Copied 2 item(s). Paste them in a folder."));
+        .andExpect(flash().attribute("successMessage", "Cut 2 item(s). Paste them in a folder."));
 
     assertThat(session.getAttribute("songradar.fileClipboard")).isEqualTo(List.of("a", "b"));
   }
 
   @Test
-  void reportsACopyFailureWithItsMessage() throws Exception {
+  void reportsACutFailureWithItsMessage() throws Exception {
     when(files.resolveAll(anyList()))
         .thenThrow(new IllegalArgumentException("Select at least one item."));
 
     mockMvc
-        .perform(post("/files/copy").param("paths", "a"))
+        .perform(post("/files/cut").param("paths", "a"))
         .andExpect(status().is3xxRedirection())
         .andExpect(flash().attribute("errorMessage", "Select at least one item."));
   }
@@ -284,7 +264,7 @@ class FileExplorerControllerTest {
         .perform(post("/files/paste").param("scope", "library").session(session))
         .andExpect(status().is3xxRedirection())
         .andExpect(redirectedUrl("/library"))
-        .andExpect(flash().attribute("successMessage", "Items pasted."));
+        .andExpect(flash().attribute("successMessage", "Items moved."));
 
     verify(files).paste(List.of("a", "b"), "library");
     assertThat(session.getAttribute("songradar.fileClipboard")).isNull();

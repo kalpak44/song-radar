@@ -62,15 +62,16 @@ class FileExplorerServiceTest {
   }
 
   @Test
-  void copiesDirectoriesAndCreatesZipArchivesWithTheirFolderStructure() throws IOException {
+  void movesDirectoriesAndCreatesZipArchivesWithTheirFolderStructure() throws IOException {
     Path album = Files.createDirectory(root.resolve("albums"));
     Files.writeString(album.resolve("track.mp3"), "music");
-    Files.createDirectory(root.resolve("copies"));
-    files.paste(List.of("albums"), "copies");
-    Path copied = files.createArchive(List.of("albums"));
+    Files.createDirectory(root.resolve("moved"));
+    files.paste(List.of("albums"), "moved");
+    Path archived = files.createArchive(List.of("moved"));
 
-    assertTrue(Files.exists(root.resolve("copies/albums/track.mp3")));
-    assertTrue(Files.size(copied) > 0);
+    assertTrue(Files.exists(root.resolve("moved/albums/track.mp3")));
+    assertFalse(Files.exists(root.resolve("albums")));
+    assertTrue(Files.size(archived) > 0);
     assertFalse(
         files.list("").stream().anyMatch(item -> item.name().startsWith(".songradar-download-")));
   }
@@ -128,18 +129,85 @@ class FileExplorerServiceTest {
   }
 
   @Test
-  void pastesFilesAndRejectsInvalidDestinationsAndSelfCopies() throws IOException {
+  void movesFilesAndRejectsInvalidDestinationsAndSelfMoves() throws IOException {
     Path albums = Files.createDirectory(root.resolve("albums"));
     Files.writeString(albums.resolve("track.mp3"), "music");
     Files.writeString(root.resolve("song.mp3"), "audio");
-    Path copies = Files.createDirectory(root.resolve("copies"));
+    Path moved = Files.createDirectory(root.resolve("moved"));
 
-    files.paste(List.of("song.mp3"), "copies");
+    files.paste(List.of("song.mp3"), "moved");
 
-    assertEquals("audio", Files.readString(copies.resolve("song.mp3")));
-    assertThrows(IllegalArgumentException.class, () -> files.paste(List.of("song.mp3"), "missing"));
-    assertThrows(IllegalArgumentException.class, () -> files.paste(List.of(""), "copies"));
+    assertEquals("audio", Files.readString(moved.resolve("song.mp3")));
+    assertFalse(Files.exists(root.resolve("song.mp3")));
+    assertThrows(IllegalArgumentException.class, () -> files.paste(List.of("albums"), "missing"));
+    assertThrows(IllegalArgumentException.class, () -> files.paste(List.of(""), "moved"));
     assertThrows(IllegalArgumentException.class, () -> files.paste(List.of("albums"), "albums"));
+    assertThrows(
+        IllegalArgumentException.class, () -> files.paste(List.of("moved/song.mp3"), "moved"));
+    assertThrows(IllegalArgumentException.class, () -> files.paste(List.of("gone.mp3"), "moved"));
+  }
+
+  /** A name already taken at the destination is replaced, which is what makes a paste a tidy-up. */
+  @Test
+  void pastingOverAnExistingNameReplacesIt() throws IOException {
+    Path listener = Files.createDirectory(root.resolve("listener"));
+    Files.writeString(listener.resolve("track.mp3"), "new");
+    Path library = Files.createDirectory(root.resolve("library"));
+    Files.writeString(library.resolve("track.mp3"), "old");
+
+    files.paste(List.of("listener/track.mp3"), "library");
+
+    assertEquals("new", Files.readString(library.resolve("track.mp3")));
+    assertFalse(Files.exists(listener.resolve("track.mp3")));
+  }
+
+  /**
+   * Two folders of the same name merge rather than one wiping the other: a listener folder moved
+   * onto one already there keeps the tracks only the destination had.
+   */
+  @Test
+  void pastingAFolderOntoOneOfTheSameNameMergesThem() throws IOException {
+    Path incoming = Files.createDirectories(root.resolve("incoming/Radio"));
+    Files.writeString(incoming.resolve("shared.mp3"), "new");
+    Files.writeString(incoming.resolve("only-incoming.mp3"), "new");
+    Path existing = Files.createDirectories(root.resolve("library/Radio"));
+    Files.writeString(existing.resolve("shared.mp3"), "old");
+    Files.writeString(existing.resolve("only-existing.mp3"), "old");
+
+    files.paste(List.of("incoming/Radio"), "library");
+
+    assertEquals("new", Files.readString(existing.resolve("shared.mp3")));
+    assertEquals("old", Files.readString(existing.resolve("only-existing.mp3")));
+    assertTrue(Files.exists(existing.resolve("only-incoming.mp3")));
+    assertFalse(Files.exists(root.resolve("incoming/Radio")));
+  }
+
+  /** A folder landing on a name a file holds replaces it, rather than refusing or merging. */
+  @Test
+  void pastingAFolderOverAFileReplacesTheFile() throws IOException {
+    Path folder = Files.createDirectories(root.resolve("incoming/track.mp3"));
+    Files.writeString(folder.resolve("inside.mp3"), "inside");
+    Path library = Files.createDirectory(root.resolve("library"));
+    Files.writeString(library.resolve("track.mp3"), "old");
+
+    files.paste(List.of("incoming/track.mp3"), "library");
+
+    assertTrue(Files.isDirectory(library.resolve("track.mp3")));
+    assertEquals("inside", Files.readString(library.resolve("track.mp3/inside.mp3")));
+  }
+
+  /** And the other way round: the folder that was there goes, contents and all. */
+  @Test
+  void pastingAFileOverAFolderReplacesTheFolder() throws IOException {
+    Files.createDirectory(root.resolve("incoming"));
+    Files.writeString(root.resolve("incoming/track.mp3"), "flat");
+    Path occupied = Files.createDirectories(root.resolve("library/track.mp3"));
+    Files.writeString(occupied.resolve("inside.mp3"), "inside");
+
+    files.paste(List.of("incoming/track.mp3"), "library");
+
+    assertTrue(Files.isRegularFile(root.resolve("library/track.mp3")));
+    assertEquals("flat", Files.readString(root.resolve("library/track.mp3")));
   }
 
   @Test

@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Comparator;
@@ -149,6 +150,12 @@ public class FileExplorerService {
     return paths.stream().map(this::resolve).toList();
   }
 
+  /**
+   * The clipboard is a cut, so what is pasted leaves the folder it came from. A name already taken
+   * at the destination is overwritten rather than refused: the library fills itself from
+   * recognitions, so the same track arrives under two listeners and tidying it up means replacing
+   * one with the other.
+   */
   public void paste(List<String> sources, String destination) throws IOException {
     Path targetDirectory = resolve(destination);
     if (!Files.isDirectory(targetDirectory, LinkOption.NOFOLLOW_LINKS)
@@ -158,11 +165,15 @@ public class FileExplorerService {
     for (String sourceValue : sources) {
       Path source = resolve(sourceValue);
       if (source.equals(root) || Files.isSymbolicLink(source))
-        throw new IllegalArgumentException("That item cannot be copied.");
+        throw new IllegalArgumentException("That item cannot be moved.");
+      if (!Files.exists(source, LinkOption.NOFOLLOW_LINKS))
+        throw new IllegalArgumentException("That item no longer exists.");
       Path target = child(targetDirectory, source.getFileName().toString());
-      if (source.equals(target) || target.startsWith(source))
-        throw new IllegalArgumentException("A folder cannot be copied into itself.");
-      copyTree(source, target);
+      if (source.equals(target))
+        throw new IllegalArgumentException("That item is already in this folder.");
+      if (target.startsWith(source))
+        throw new IllegalArgumentException("A folder cannot be moved into itself.");
+      moveTree(source, target);
     }
   }
 
@@ -273,28 +284,38 @@ public class FileExplorerService {
     return name;
   }
 
-  private static void copyTree(Path source, Path target) throws IOException {
-    Files.walkFileTree(
-        source,
-        new SimpleFileVisitor<>() {
-          @Override
-          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
-              throws IOException {
-            if (Files.isSymbolicLink(dir))
-              throw new IOException("Symbolic links cannot be copied.");
-            Files.createDirectory(target.resolve(source.relativize(dir)));
-            return FileVisitResult.CONTINUE;
-          }
-
-          @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-              throws IOException {
-            if (Files.isSymbolicLink(file))
-              throw new IOException("Symbolic links cannot be copied.");
-            Files.copy(file, target.resolve(source.relativize(file)));
-            return FileVisitResult.CONTINUE;
-          }
-        });
+  /**
+   * A free name is a rename, which is atomic and moves no bytes however large the folder is. Only a
+   * name that is taken needs more than that: two folders are merged entry by entry so that moving a
+   * listener folder onto one of the same name replaces the tracks they share rather than every
+   * track the destination already had, and anything else is overwritten outright.
+   */
+  private static void moveTree(Path source, Path target) throws IOException {
+    if (Files.isSymbolicLink(source)) throw new IOException("Symbolic links cannot be moved.");
+    if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+      Files.move(source, target);
+      return;
+    }
+    if (Files.isDirectory(source, LinkOption.NOFOLLOW_LINKS)
+        && Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) {
+      // Listed in full before anything moves: the listing is a live view of a directory that
+      // this loop is emptying.
+      List<Path> entries;
+      try (var children = Files.list(source)) {
+        entries = children.toList();
+      }
+      for (Path entry : entries) {
+        moveTree(entry, target.resolve(entry.getFileName()));
+      }
+      Files.delete(source);
+      return;
+    }
+    if (Files.isDirectory(target, LinkOption.NOFOLLOW_LINKS)) {
+      deleteTree(target);
+      Files.move(source, target);
+      return;
+    }
+    Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
   }
 
   private static void deleteTree(Path target) throws IOException {

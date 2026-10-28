@@ -103,8 +103,12 @@ public class FileExplorerController {
         "Files uploaded.");
   }
 
-  @PostMapping("/files/copy")
-  public String copy(
+  /**
+   * Nothing is moved here: the cut only records what to move, and the paste that follows is what
+   * touches the filesystem. A selection that is cut and never pasted therefore stays where it is.
+   */
+  @PostMapping("/files/cut")
+  public String cut(
       @RequestParam(defaultValue = "") String path,
       @RequestParam(defaultValue = "all") String scope,
       @RequestParam("paths") List<String> selected,
@@ -114,7 +118,7 @@ public class FileExplorerController {
       var validated = files.resolveAll(selected);
       session.setAttribute(CLIPBOARD, validated.stream().map(files::relative).toList());
       redirect.addFlashAttribute(
-          "successMessage", "Copied " + validated.size() + " item(s). Paste them in a folder.");
+          "successMessage", "Cut " + validated.size() + " item(s). Paste them in a folder.");
     } catch (RuntimeException e) {
       redirect.addFlashAttribute("errorMessage", message(e));
     }
@@ -137,7 +141,7 @@ public class FileExplorerController {
           files.paste(selected, scopedPath(path, scope));
           session.removeAttribute(CLIPBOARD);
         },
-        "Items pasted.");
+        "Items moved.");
   }
 
   @PostMapping("/files/delete")
