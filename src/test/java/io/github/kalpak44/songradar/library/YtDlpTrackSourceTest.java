@@ -16,6 +16,6 @@ class YtDlpTrackSourceTest {
 
   @Test
   void isNamedForTheCatalogueRatherThanTheTool() {
-    assertThat(new YtDlpTrackSource("yt-dlp", "", 5).name()).isEqualTo("YouTube");
+    assertThat(new YtDlpTrackSource("yt-dlp", "", 5).name()).isEqualTo("YouTube Music");
   }
 }

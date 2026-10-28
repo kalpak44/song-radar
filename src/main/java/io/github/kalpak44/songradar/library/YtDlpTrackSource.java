@@ -1,7 +1,9 @@
 package io.github.kalpak44.songradar.library;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,9 +29,14 @@ import tools.jackson.databind.json.JsonMapper;
  * YouTube: its own endpoints answer LOGIN_REQUIRED to every client, and the public mirrors are
  * gone, so the alternative to this process was no mainstream catalogue at all.
  *
+ * <p>It searches YouTube Music rather than YouTube. Both are served by the same yt-dlp and the same
+ * media, but a YouTube Music result is a song with an artist and an album attached, while a YouTube
+ * result is whatever a channel uploaded under that name — and the artist is the half of the match
+ * that decides whether this is the right recording; see docs/music-sources.md.
+ *
  * <p>It is last because it is the slowest and the most fragile — YouTube changes what it serves and
  * a yt-dlp that is months old downloads metadata happily and then fails on the media with a 403.
- * The scheduled source check is what reports that; see docs/music-sources.md.
+ * The scheduled source check is what reports that.
  */
 @Component
 @Order(9)
@@ -41,6 +48,16 @@ public class YtDlpTrackSource implements TrackSource {
 
   /** Enough for a slow extraction, short enough that a hung process is not a stuck download. */
   private static final int SEARCH_TIMEOUT_SECONDS = 60;
+
+  /**
+   * YouTube Music's own "Songs" search filter, which is what keeps album, artist and playlist rows
+   * out of the result. It is an opaque blob and may stop being honoured; the search then answers
+   * with the mixed listing it serves by default, which is why only watch entries are kept below.
+   */
+  private static final String SONGS_ONLY = "EgWKAQIIAWoKEAoQCRADEAQQBQ%3D%3D";
+
+  /** How many results are described. Measured at roughly a second and a half each. */
+  private static final int CANDIDATES = 5;
 
   /** The extraction directory holds downloaded audio, so only this process may read it. */
   private static final FileAttribute<Set<PosixFilePermission>> PRIVATE_DIRECTORY =
@@ -68,30 +85,14 @@ public class YtDlpTrackSource implements TrackSource {
 
   @Override
   public String name() {
-    return "YouTube";
+    return "YouTube Music";
   }
 
   @Override
   public Optional<SourceTrack> find(String artist, String title) {
     try {
-      // Flat results: a full extraction per candidate costs a request each and everything
-      // scored here is in the flat entry already.
-      String output =
-          run(
-              SEARCH_TIMEOUT_SECONDS,
-              executable,
-              "--no-warnings",
-              "--flat-playlist",
-              "--dump-json",
-              "ytsearch5:" + (artist + " " + title).trim());
-      List<Entry> entries = new ArrayList<>();
-      for (String line : output.split("\\R")) {
-        if (!line.isBlank()) {
-          entries.add(JSON.readValue(line, Entry.class));
-        }
-      }
-      return entries.stream()
-          .filter(entry -> entry.id() != null)
+      List<Entry> candidates = describe(search(artist, title));
+      return candidates.stream()
           .max(Comparator.comparingDouble(entry -> score(entry, artist, title)))
           .filter(entry -> score(entry, artist, title) >= TrackMatching.MINIMUM_SCORE)
           .map(entry -> toSourceTrack(entry, artist));
@@ -102,18 +103,75 @@ public class YtDlpTrackSource implements TrackSource {
           log.info("yt-dlp is not installed at \"{}\"; skipping this source", executable);
         }
       } else {
-        log.info("yt-dlp could not serve \"{} - {}\": {}", artist, title, exception.toString());
+        log.info(
+            "YouTube Music could not serve \"{} - {}\": {}", artist, title, exception.toString());
       }
       return Optional.empty();
     }
   }
 
+  /**
+   * Flat, because the search listing carries nothing that is scored here — a YouTube Music result
+   * is a title and an id, and the artist and the length arrive only with the extraction below.
+   */
+  private List<String> search(String artist, String title) throws IOException {
+    String query = URLEncoder.encode((artist + " " + title).trim(), StandardCharsets.UTF_8);
+    Run search =
+        run(
+            SEARCH_TIMEOUT_SECONDS,
+            executable,
+            "--no-warnings",
+            "--flat-playlist",
+            "--playlist-end",
+            String.valueOf(CANDIDATES),
+            "--dump-json",
+            "https://music.youtube.com/search?q=" + query + "&sp=" + SONGS_ONLY);
+    List<String> ids = new ArrayList<>();
+    for (Entry entry : parse(search.succeededOrThrow())) {
+      // An artist or album row extracts to a whole channel rather than a song, and the songs
+      // filter is the only thing keeping them out of this listing.
+      if (entry.id() != null && "Youtube".equals(entry.ieKey())) {
+        ids.add(entry.id());
+      }
+    }
+    return ids;
+  }
+
+  /**
+   * One process for every candidate: each is a separate extraction either way, and starting the
+   * binary once is what keeps describing five results to about seven seconds. A track that has gone
+   * private fails its own extraction and yt-dlp still exits non-zero, so the output is read rather
+   * than the exit code — the remaining candidates are the point of asking for five.
+   */
+  private List<Entry> describe(List<String> ids) throws IOException {
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    List<String> command =
+        new ArrayList<>(
+            List.of(
+                executable, "--no-warnings", "--no-playlist", "--skip-download", "--dump-json"));
+    ids.forEach(id -> command.add(watchUrl(id)));
+    Run described = run(SEARCH_TIMEOUT_SECONDS, command.toArray(new String[0]));
+    return parse(described.output().isBlank() ? described.succeededOrThrow() : described.output());
+  }
+
+  private static List<Entry> parse(String output) {
+    List<Entry> entries = new ArrayList<>();
+    for (String line : output.split("\\R")) {
+      if (!line.isBlank()) {
+        entries.add(JSON.readValue(line, Entry.class));
+      }
+    }
+    return entries;
+  }
+
   private SourceTrack toSourceTrack(Entry entry, String artist) {
     return new SourceTrack(
         name(),
-        entry.title(),
-        entry.channel() == null ? artist : entry.channel(),
-        Math.round(entry.duration() * 1000),
+        entry.heading(),
+        entry.performer() == null ? artist : entry.performer(),
+        entry.durationMillis(),
         out -> download(entry.id(), out));
   }
 
@@ -144,8 +202,8 @@ public class YtDlpTrackSource implements TrackSource {
         command.add("--ffmpeg-location");
         command.add(ffmpegLocation);
       }
-      command.add("https://www.youtube.com/watch?v=" + id);
-      run(downloadTimeoutSeconds, command.toArray(new String[0]));
+      command.add(watchUrl(id));
+      run(downloadTimeoutSeconds, command.toArray(new String[0])).succeededOrThrow();
       Path audio = work.resolve("track.mp3");
       if (!Files.isRegularFile(audio)) {
         throw new IOException("yt-dlp produced no audio file");
@@ -158,11 +216,16 @@ public class YtDlpTrackSource implements TrackSource {
     }
   }
 
+  /** The media is the same on either host; this one is where the search found it. */
+  private static String watchUrl(String id) {
+    return "https://music.youtube.com/watch?v=" + id;
+  }
+
   /**
    * Arguments are passed as a list, never through a shell: the query is a track title that came
    * from a recognition provider, and quoting it into a command line would be an injection.
    */
-  private String run(int timeoutSeconds, String... command) throws IOException {
+  private Run run(int timeoutSeconds, String... command) throws IOException {
     Process process =
         new ProcessBuilder(command)
             .redirectErrorStream(false)
@@ -174,13 +237,9 @@ public class YtDlpTrackSource implements TrackSource {
         process.destroyForcibly();
         throw new IOException("yt-dlp did not finish within " + timeoutSeconds + "s");
       }
-      if (process.exitValue() != 0) {
-        String error =
-            new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
-        throw new IOException(
-            "yt-dlp exited " + process.exitValue() + (error.isEmpty() ? "" : ": " + error));
-      }
-      return output;
+      String error =
+          new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+      return new Run(process.exitValue(), output, error);
     } catch (InterruptedException exception) {
       Thread.currentThread().interrupt();
       process.destroyForcibly();
@@ -197,9 +256,45 @@ public class YtDlpTrackSource implements TrackSource {
   }
 
   private static double score(Entry entry, String artist, String title) {
-    String channel = entry.channel() == null ? "" : entry.channel();
-    return TrackMatching.score(entry.title() + " " + channel, artist, title);
+    String performer = entry.performer() == null ? "" : entry.performer();
+    return TrackMatching.score(entry.heading() + " " + performer, artist, title);
   }
 
-  record Entry(String id, String title, String channel, double duration) {}
+  /** What a finished yt-dlp left behind, so a partly failed run can still be read. */
+  private record Run(int exitCode, String output, String error) {
+
+    String succeededOrThrow() throws IOException {
+      if (exitCode != 0) {
+        throw new IOException("yt-dlp exited " + exitCode + (error.isEmpty() ? "" : ": " + error));
+      }
+      return output;
+    }
+  }
+
+  /**
+   * A flat search result carries only the id and the title, and leaves everything else null; the
+   * rest arrives from the extraction. {@code track} and {@code artist} are what YouTube Music knows
+   * about the song, where {@code title} and {@code channel} are what YouTube would have said.
+   */
+  record Entry(
+      String id,
+      String title,
+      String track,
+      String artist,
+      String channel,
+      Double duration,
+      @JsonProperty("ie_key") String ieKey) {
+
+    String heading() {
+      return track == null ? title : track;
+    }
+
+    String performer() {
+      return artist == null ? channel : artist;
+    }
+
+    long durationMillis() {
+      return duration == null ? 0 : Math.round(duration * 1000);
+    }
+  }
 }

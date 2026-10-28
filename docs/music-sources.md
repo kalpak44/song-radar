@@ -11,7 +11,7 @@ stops working.
 | 2 | SoundCloud | undocumented | HLS: MPEG or AAC in fMP4 | only for the AAC variants |
 | 3 | JioSaavn | undocumented | progressive AAC in MP4 | always |
 | 4 | Bandcamp | undocumented | MP3 128 kbps | none |
-| 5 | YouTube (yt-dlp) | none — a subprocess | MP3, extracted by ffmpeg | done by yt-dlp |
+| 5 | YouTube Music (yt-dlp) | none — a subprocess | MP3, extracted by ffmpeg | done by yt-dlp |
 
 ## What breaks, and where to look
 
@@ -42,7 +42,7 @@ the matcher's marker list is for.
 **Audius is reached through a discovery node** rather than a fixed host; the registry at
 `api.audius.co` names the ones currently serving.
 
-## YouTube runs a subprocess, and that is a deliberate exception
+## YouTube Music runs a subprocess, and that is a deliberate exception
 
 Nothing else reaches YouTube. Its own player endpoints answer `LOGIN_REQUIRED` or `ERROR` to every
 client — the mobile-client spoofs that SpotiFlyer relies on included — and the public mirrors are
@@ -50,6 +50,29 @@ gone: Invidious instances answer 401, 403 or 530, and Piped is dead. The only ro
 which is a program, not a library. This application otherwise launches no processes, so the one that
 does is confined to this source and kept last in the chain: it is the slowest, and the only one that
 can be broken by something outside this repository.
+
+**It searches YouTube Music, not YouTube.** Both are the same site to yt-dlp and serve the same
+media, but a YouTube Music result is a song carrying an artist, an album and a length, while a
+YouTube result is whatever a channel uploaded under that name. The artist is the half of the match
+that decides whether a result is the right recording, and `TrackMatching` had only a channel name to
+score it against — "Around the World" uploaded by "topic" channels, DJ sets and reuploads all answer
+the same search.
+
+**That costs a second process per search.** The YouTube Music search listing is flat: its entries
+carry an id and a title and leave the artist, the album and the duration null, so the five
+candidates are extracted in one further yt-dlp run, which was measured at about a second and a half
+each. The search URL carries YouTube Music's own *Songs* filter (`sp=EgWKAQIIAWoKEAoQCRADEAQQBQ==`),
+an opaque blob that may quietly stop being honoured — the search then answers with the mixed listing
+that includes artist and album rows, and an album row extracts to a whole playlist rather than a
+song, so only entries yt-dlp labels `ie_key: Youtube` are described.
+
+**A candidate that fails its own extraction must not take the other four with it.** yt-dlp exits
+non-zero when any URL in the run failed, so the describe step reads the output it did produce and
+only treats the exit code as fatal when nothing came back at all.
+
+**`duration` is null in a flat result, and Jackson 3 refuses to map null onto a primitive** — it is
+a `Double` on the entry for that reason. A `double` field fails the whole parse with
+`Cannot map null into type double`, which surfaces as this source silently finding nothing.
 
 **It is paired with ffmpeg and cannot run without it.** The M4A stream YouTube serves needs a
 container fixup before anything can decode it — with `--fixup never` the file is rejected by this
