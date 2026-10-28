@@ -42,12 +42,15 @@
              stops. -->
         <ytdlp.version>2026.10.21</ytdlp.version>
         <ytdlp.sha256>d39487ff5c8eb1254d6f142bea05f495440d87ff529b2df786dcd3b5f66b23a8</ytdlp.sha256>
-        <!-- Tagged b6.1.1 by its publisher but is in fact the 7.0.2 static build, offered
-             as one file so the build needs no unpacking step. ffprobe is deliberately not
-             bundled: it would add 80 MB and audio extraction was verified to work
-             without it. -->
-        <ffmpeg.version>b6.1.1</ffmpeg.version>
-        <ffmpeg.sha256>e7e7fb30477f717e6f55f9180a70386c62677ef8a4d4d1a5d948f4098aa3eb99</ffmpeg.sha256>
+        <!-- A fully static musl build, so it starts on the Alpine base image; the
+             glibc-linked builds from BtbN and Jellyfin do not. The publisher ships one
+             binary per release rather than a tarball, so the build still needs no
+             unpacking step. ffprobe is deliberately not bundled: it would add another
+             90 MB and audio extraction was verified to work without it. -->
+        <ffmpeg.version>9.0.2</ffmpeg.version>
+        <ffmpeg.release>v9.0.2-12Oct26-c3e6b6071ce0</ffmpeg.release>
+        <ffmpeg.asset>ffmpeg-9.0.2-20261012-amd64</ffmpeg.asset>
+        <ffmpeg.sha256>0cbf5e656a2cf2e6f4f265f4a784e97f3812fcfd805599264ca3ab42956807be</ffmpeg.sha256>
 
         <!-- The source checks reach the real music catalogues, so they are held out of the
              normal build and run on their own schedule. -->
@@ -256,10 +259,39 @@
                             <goal>wget</goal>
                         </goals>
                         <configuration>
-                            <uri>https://github.com/eugeneware/ffmpeg-static/releases/download/${ffmpeg.version}/ffmpeg-linux-x64</uri>
+                            <uri>https://github.com/start-the-fire/ffmpeg-musl-forge/releases/download/${ffmpeg.release}/${ffmpeg.asset}</uri>
                             <outputDirectory>${project.build.directory}/jib-extra/usr/local/bin</outputDirectory>
                             <outputFileName>ffmpeg</outputFileName>
                             <sha256>${ffmpeg.sha256}</sha256>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- The scanner's ffmpeg classifier matches the literal format string
+                 "%s version <version>" inside a file named ffmpeg. FFmpeg 9 builds that
+                 string at runtime, so the binary alone is no longer recognised and the
+                 scan would silently stop seeing the bundled ffmpeg. Generate the metadata
+                 file the classifier needs from the same property that pins the binary;
+                 it is never executed. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>ffmpeg-scan-metadata</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>copy-resources</goal>
+                        </goals>
+                        <configuration>
+                            <outputDirectory>${project.build.directory}/jib-extra/usr/local/share/song-radar</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>src/main/jib-metadata</directory>
+                                    <filtering>true</filtering>
+                                </resource>
+                            </resources>
                         </configuration>
                     </execution>
                 </executions>

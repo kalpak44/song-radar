@@ -1,0 +1,5 @@
+# Read by the image scanner's FFmpeg binary classifier. FFmpeg 9 formats its
+# version at runtime instead of embedding the literal "%s version 9.0.2" string
+# the classifier looks for, so the binary on its own is no longer recognised.
+# This file is metadata only and is never executed by the application.
+%s version @ffmpeg.version@
