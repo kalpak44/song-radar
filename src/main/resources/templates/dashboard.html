@@ -140,7 +140,17 @@
                                     <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-800 text-slate-400"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>
                                 <div class="min-w-0">
                                         <a th:href="@{/files/download(path=${file.relativePath})}" th:text="${file.name}" class="block truncate font-medium text-slate-200 hover:text-emerald-300">file.mp3</a>
-                                        <audio th:if="${file.playable}" controls preload="none" th:src="@{/files/audio(path=${file.relativePath})}" th:aria-label="'Play ' + ${file.name}" class="mt-2 h-8 max-w-[18rem]"></audio>
+                                        <div th:if="${file.playable}" data-row-player class="mt-2 flex max-w-[20rem] items-center gap-2">
+                                            <audio data-row-audio preload="none" th:src="@{/files/audio(path=${file.relativePath})}" class="hidden"></audio>
+                                            <button type="button" data-row-toggle th:attr="aria-label='Play ' + ${file.name}"
+                                                    class="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full bg-slate-800 text-slate-200 transition hover:bg-emerald-400 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-emerald-300">
+                                                <svg data-row-icon class="size-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.5-.86l11 6.5a1 1 0 0 1 0 1.72l-11 6.5A1 1 0 0 1 7 17.5z"/></svg>
+                                            </button>
+                                            <input type="range" data-row-seek min="0" max="0" value="0" step="any" disabled
+                                                   th:attr="aria-label='Seek within ' + ${file.name}"
+                                                   class="min-w-0 flex-1 cursor-pointer accent-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">
+                                            <span data-row-time class="shrink-0 font-mono text-[0.68rem] tabular-nums text-slate-500">0:00 / 0:00</span>
+                                        </div>
                                     </div>
                                 </div>
                             </td>
@@ -270,6 +280,52 @@
                     event.preventDefault(); pasteButton.click();
                 }
             });
+            const PLAY_ICON = '<path d="M7 4.5a1 1 0 0 1 1.5-.86l11 6.5a1 1 0 0 1 0 1.72l-11 6.5A1 1 0 0 1 7 17.5z"/>';
+            const PAUSE_ICON = '<path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/>';
+            const clock = seconds => {
+                if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
+                const whole = Math.floor(seconds);
+                return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+            };
+            // Keeps a range input in step with an audio element. The length is unknown until the
+            // metadata arrives and stays unknown for a source that never reports one, so the bar
+            // is left disabled rather than seeking nowhere; a drag owns the value until released.
+            const wireSeek = (audio, seek, render) => {
+                let scrubbing = false;
+                const sync = () => {
+                    const length = Number.isFinite(audio.duration) ? audio.duration : 0;
+                    const at = Math.min(audio.currentTime, length);
+                    seek.max = length;
+                    seek.disabled = length === 0;
+                    if (!scrubbing) seek.value = at;
+                    render(scrubbing ? Number(seek.value) : at, length);
+                };
+                audio.addEventListener('loadedmetadata', sync);
+                audio.addEventListener('timeupdate', sync);
+                seek.addEventListener('input', () => { scrubbing = true; render(Number(seek.value), Number(seek.max)); });
+                seek.addEventListener('change', () => { audio.currentTime = Number(seek.value); scrubbing = false; });
+                return sync;
+            };
+            // One track at a time. Captured on the document because a play event does not bubble,
+            // which also covers the player above against the row players below.
+            document.addEventListener('play', event => {
+                document.querySelectorAll('audio').forEach(other => { if (other !== event.target) other.pause(); });
+            }, true);
+            document.querySelectorAll('[data-row-player]').forEach(row => {
+                const audio = row.querySelector('[data-row-audio]');
+                const toggle = row.querySelector('[data-row-toggle]');
+                const icon = row.querySelector('[data-row-icon]');
+                const time = row.querySelector('[data-row-time]');
+                wireSeek(audio, row.querySelector('[data-row-seek]'), (at, length) => {
+                    time.textContent = `${clock(at)} / ${clock(length)}`;
+                });
+                const paint = () => { icon.innerHTML = audio.paused ? PLAY_ICON : PAUSE_ICON; };
+                toggle.addEventListener('click', () => {
+                    if (audio.paused) audio.play().catch(() => { time.textContent = 'unplayable'; });
+                    else audio.pause();
+                });
+                ['play', 'pause', 'ended'].forEach(event => audio.addEventListener(event, paint));
+            });
             const playAllButton = document.getElementById('play-all');
             if (playAllButton) {
                 const player = document.getElementById('play-all-audio');
@@ -293,7 +349,6 @@
                 let currentTrack = 0;
                 let finished = false;
                 let shuffled = false;
-                let scrubbing = false;
                 const remaining = () => tracks.length - deleted.size;
                 const shuffleFrom = start => {
                     for (let index = queue.length - 1; index > start; index -= 1) {
@@ -324,21 +379,17 @@
                         ? 'Play every saved track in the library in random order'
                         : 'Play every saved track in the library in order';
                 };
-                const clock = seconds => {
-                    if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
-                    const whole = Math.floor(seconds);
-                    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
-                };
-                // Length is unknown until the metadata arrives, and stays unknown for a source
-                // that never reports one — the bar is left disabled rather than seeking nowhere.
-                const syncSeek = () => {
-                    const length = finished || !Number.isFinite(player.duration) ? 0 : player.duration;
-                    const at = Math.min(player.currentTime, length);
-                    seek.max = length;
-                    seek.disabled = length === 0;
-                    if (!scrubbing) seek.value = at;
-                    elapsedLabel.textContent = clock(scrubbing ? Number(seek.value) : at);
+                const syncSeek = wireSeek(player, seek, (at, length) => {
+                    elapsedLabel.textContent = clock(at);
                     durationLabel.textContent = clock(length);
+                });
+                // Nothing is playing any more, so the bar shows no track rather than the last one.
+                const clearSeek = () => {
+                    seek.value = 0;
+                    seek.max = 0;
+                    seek.disabled = true;
+                    elapsedLabel.textContent = '0:00';
+                    durationLabel.textContent = '0:00';
                 };
                 const playTrack = async from => {
                     const position = live(from, 1);
@@ -349,7 +400,7 @@
                             ? `Finished playing ${remaining()} tracks`
                             : 'No tracks are left in the library';
                         playAllButton.innerHTML = 'Play all again';
-                        syncSeek();
+                        clearSeek();
                         syncTransport();
                         return;
                     }
@@ -364,10 +415,12 @@
                     try { await player.play(); }
                     catch (_) { playerStatus.textContent = 'Playback was blocked. Press Play all to continue.'; }
                 };
-                player.addEventListener('loadedmetadata', syncSeek);
-                player.addEventListener('timeupdate', syncSeek);
-                seek.addEventListener('input', () => { scrubbing = true; elapsedLabel.textContent = clock(Number(seek.value)); });
-                seek.addEventListener('change', () => { player.currentTime = Number(seek.value); scrubbing = false; });
+                // A row player pauses this one through the rule above, so the label follows the
+                // element rather than the button that was pressed.
+                player.addEventListener('play', () => { playAllButton.innerHTML = 'Pause playback'; });
+                player.addEventListener('pause', () => {
+                    if (player.src && !player.ended && !finished) playAllButton.innerHTML = 'Resume playback';
+                });
                 player.addEventListener('ended', () => playTrack(currentTrack + 1));
                 previousButton.addEventListener('click', () => playTrack(live(currentTrack - 1, -1)));
                 nextButton.addEventListener('click', () => playTrack(currentTrack + 1));
