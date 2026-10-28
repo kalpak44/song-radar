@@ -20,6 +20,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
@@ -142,6 +143,22 @@ public class FileExplorerController {
           session.removeAttribute(CLIPBOARD);
         },
         "Items moved.");
+  }
+
+  /**
+   * The player deletes the track it is playing, so this answers with a status rather than the
+   * redirect the form actions use: the page that would be reloaded is the one playing the music. It
+   * is also the only way the page can tell a refused delete from a completed one.
+   */
+  @PostMapping("/files/delete-track")
+  @ResponseBody
+  public ResponseEntity<Void> deleteTrack(@RequestParam String path) {
+    try {
+      files.delete(List.of(path));
+      return ResponseEntity.noContent().build();
+    } catch (IOException | RuntimeException exception) {
+      return ResponseEntity.badRequest().build();
+    }
   }
 
   @PostMapping("/files/delete")

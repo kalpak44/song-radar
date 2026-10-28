@@ -270,6 +270,27 @@ class FileExplorerControllerTest {
     assertThat(session.getAttribute("songradar.fileClipboard")).isNull();
   }
 
+  /** The player deletes without leaving the page, so it needs a status rather than a redirect. */
+  @Test
+  void deletesASingleTrackWithoutRedirecting() throws Exception {
+    mockMvc
+        .perform(post("/files/delete-track").param("path", "library/Listener/song.mp3"))
+        .andExpect(status().isNoContent());
+
+    verify(files).delete(List.of("library/Listener/song.mp3"));
+  }
+
+  @Test
+  void reportsARefusedTrackDeleteAsABadRequest() throws Exception {
+    doThrow(new IllegalArgumentException("That item no longer exists."))
+        .when(files)
+        .delete(List.of("library/gone.mp3"));
+
+    mockMvc
+        .perform(post("/files/delete-track").param("path", "library/gone.mp3"))
+        .andExpect(status().isBadRequest());
+  }
+
   @Test
   void deletesSelectedItems() throws Exception {
     mockMvc
