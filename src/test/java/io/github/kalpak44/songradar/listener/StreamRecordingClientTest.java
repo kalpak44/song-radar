@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,15 +38,35 @@ class StreamRecordingClientTest {
 
   /**
    * The pinned glibc ffmpeg the build downloads for the tests; the image runs the same FFmpeg
-   * release built for musl. Falls back to PATH for an IDE run outside Maven.
+   * release built for musl. Falls back to PATH for an IDE run outside Maven, and for a developer
+   * machine that is not Linux — the download is a Linux binary, and running it anywhere else fails
+   * as "cannot execute binary file", which reads as a broken decoder rather than a wrong build.
    */
   private static String ffmpeg() {
     String configured = System.getProperty("songradar.test.ffmpeg", "ffmpeg");
     Path binary = Path.of(configured);
-    if (Files.isRegularFile(binary) && !binary.toFile().canExecute()) {
-      assertTrue(binary.toFile().setExecutable(true), "could not make " + binary + " executable");
+    if (!Files.isRegularFile(binary)) {
+      return configured;
     }
-    return configured;
+    binary.toFile().setExecutable(true);
+    return starts(configured) ? configured : "ffmpeg";
+  }
+
+  /** Whether this machine can run that binary at all, which is the only thing worth asking. */
+  private static boolean starts(String command) {
+    try {
+      Process process =
+          new ProcessBuilder(command, "-version")
+              .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+              .redirectError(ProcessBuilder.Redirect.DISCARD)
+              .start();
+      return process.waitFor(30, TimeUnit.SECONDS) && process.exitValue() == 0;
+    } catch (IOException exception) {
+      return false;
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
   }
 
   @AfterEach
