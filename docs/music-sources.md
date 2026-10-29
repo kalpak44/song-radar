@@ -1,17 +1,45 @@
 # Music sources
 
-Where `SourcedMusicDownloader` gets a detected track. Three sources are tried in order; the first
-that returns a playable MP3 wins. They are third-party APIs, two of them undocumented, so they are
+Where `SourcedMusicDownloader` gets a detected track. Five sources are tried in order; the first
+that returns a playable MP3 wins. They are third-party APIs, four of them undocumented, so they are
 expected to rot — `SourceAvailabilityTest` downloads from each one on a schedule and fails when one
 stops working.
 
-| Order | Source | API | Audio served | Transcode |
-|-------|--------|-----|--------------|-----------|
-| 1 | Audius | documented, public | MP3 320 kbps | none |
-| 2 | SoundCloud | undocumented | HLS: MPEG or AAC in fMP4 | only for the AAC variants |
-| 3 | JioSaavn | undocumented | progressive AAC in MP4 | always |
-| 4 | Bandcamp | undocumented | MP3 128 kbps | none |
-| 5 | YouTube Music (yt-dlp) | none — a subprocess | MP3, extracted by ffmpeg | done by yt-dlp |
+| Order | Source | API | Audio served | What is filed |
+|-------|--------|-----|--------------|---------------|
+| 1 | Audius | documented, public | MP3 320 kbps | the same bytes |
+| 2 | JioSaavn | undocumented | progressive AAC 320 kbps in MP4 | MP3 192 kbps |
+| 3 | YouTube Music (yt-dlp) | none — a subprocess | Opus ~160 kbps | MP3, LAME V0, by ffmpeg |
+| 4 | SoundCloud | undocumented | HLS: MPEG 128 kbps, or AAC 160/256 kbps | the MPEG bytes, or MP3 192 kbps |
+| 5 | Bandcamp | undocumented | MP3 128 kbps | the same bytes |
+
+## The order is the audio, best first
+
+The first source that answers wins, so nothing downstream gets another chance at a better copy —
+which makes the order a quality ranking and not a preference. Two things decide a place in it: the
+bitrate the source serves, and whether this project has to decode and re-encode it to get an MP3.
+
+Audius leads because 320 kbps MP3 needs neither. JioSaavn serves the same bitrate as AAC, which
+costs a decode and lands at 192 kbps. YouTube Music's Opus is nominally the lowest bitrate of the
+three, but Opus at 160 kbps is worth more than the 128 kbps MP3 the last two hand over, and yt-dlp
+re-encodes it with ffmpeg at LAME V0 rather than through the transcoder here. SoundCloud and
+Bandcamp are both 128 kbps; SoundCloud goes first because its catalogue is wider.
+
+**`@Order` on each class is what Spring reads, and `TrackSourceOrderTest` is what keeps the values
+apart.** Audius and SoundCloud were both `@Order(1)` for a while, which left the choice between a
+320 kbps source and a 128 kbps one to the order the classpath happened to be scanned in.
+
+**Ranking YouTube Music third costs time on every miss above it.** A search there is one flat
+listing plus five extractions, about eight seconds, and it runs before SoundCloud is ever asked.
+YouTube also refuses datacenter addresses, so a deployment that is blocked pays that on every
+download without ever getting a file. Moving it back to the end is a one-line change to its
+`@Order`.
+
+**The transcoder caps what the AAC sources can deliver.** `Mp3Encoding` encodes at 192 kbps CBR, so
+JioSaavn's 320 kbps source and SoundCloud's `aac_256k` both arrive better than they are filed. The
+decoder behind it also blanks frames it cannot handle — 0.4% at 320 kbps, 2.4% at 256 kbps, 7.9% at
+160 kbps — which is why the sources that need no decode are ranked above the ones that do. See
+docs/recording.md for what that decoder does and how it was measured.
 
 ## What breaks, and where to look
 
@@ -47,9 +75,9 @@ the matcher's marker list is for.
 Nothing else reaches YouTube. Its own player endpoints answer `LOGIN_REQUIRED` or `ERROR` to every
 client — the mobile-client spoofs that SpotiFlyer relies on included — and the public mirrors are
 gone: Invidious instances answer 401, 403 or 530, and Piped is dead. The only route left is yt-dlp,
-which is a program, not a library. This application otherwise launches no processes, so the one that
-does is confined to this source and kept last in the chain: it is the slowest, and the only one that
-can be broken by something outside this repository.
+which is a program, not a library. It is the slowest source and the only one that can be broken by
+something outside this repository, which is why it sat last in the chain until the order was made a
+quality ranking; what keeps it third now is the audio it serves, not what it costs to run.
 
 **It searches YouTube Music, not YouTube.** Both are the same site to yt-dlp and serve the same
 media, but a YouTube Music result is a song carrying an artist, an album and a length, while a

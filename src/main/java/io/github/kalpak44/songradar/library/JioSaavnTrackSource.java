@@ -20,8 +20,10 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * The second place a detected track is looked for. Its catalogue is strongest where SoundCloud is
- * weakest, and it serves one progressive AAC file rather than a playlist.
+ * Second, because it is the best audio after Audius: 320 kbps AAC, asked for by bitrate. What
+ * arrives is better than what is filed — the transcoder re-encodes at 192 kbps and the AAC decoder
+ * blanks about one frame in 250 — so a source that needs no decode outranks it. Its catalogue is
+ * strongest where SoundCloud is weakest, and it serves one progressive file rather than a playlist.
  */
 @Component
 @Order(2)

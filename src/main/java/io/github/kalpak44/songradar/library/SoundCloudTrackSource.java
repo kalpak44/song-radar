@@ -22,9 +22,14 @@ import org.springframework.web.client.RestClient;
 /**
  * Searches SoundCloud and serves the match as MP3. Audio arrives as an HLS playlist: its MPEG
  * variant is copied through, and its AAC variant is transcoded.
+ *
+ * <p>Fourth, because what it usually hands over is 128 kbps: the MPEG variant it advertises on
+ * nearly every upload is {@code mp3_1_0}, and that is preferred here over the AAC variants because
+ * it needs no decode. Its catalogue is wide, which is what keeps it above Bandcamp rather than
+ * below it.
  */
 @Component
-@Order(1)
+@Order(4)
 public class SoundCloudTrackSource implements TrackSource {
 
   private static final Logger log = LoggerFactory.getLogger(SoundCloudTrackSource.class);

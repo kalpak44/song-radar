@@ -21,11 +21,12 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Serves MP3 with no transcoding, which is why it is worth having despite a catalogue that leans
- * towards remixes and reworks — the matcher is what keeps those out.
+ * Last, and still worth having: its MP3 is copied through untouched, but the only stream it offers
+ * without a purchase is 128 kbps, and its catalogue leans towards remixes and reworks — the matcher
+ * is what keeps those out.
  */
 @Component
-@Order(4)
+@Order(5)
 public class BandcampTrackSource implements TrackSource {
 
   private static final Logger log = LoggerFactory.getLogger(BandcampTrackSource.class);

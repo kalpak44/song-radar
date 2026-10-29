@@ -13,8 +13,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 /**
- * Tried first: the only source here with a documented public API, and the only one that serves MP3
- * already encoded. Its catalogue is narrower than the others, so a miss here is routine.
+ * Tried first, because nothing here delivers better audio: 320 kbps MP3 that is copied through
+ * untouched, where every source below it is either half that bitrate or has to be decoded and
+ * re-encoded on the way. It is also the only source with a documented public API. Its catalogue is
+ * narrower than the others, so a miss here is routine — see docs/music-sources.md for the order.
  */
 @Component
 @Order(1)

@@ -25,21 +25,28 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Last in the chain, and the only source that runs another program. Nothing else here reaches
- * YouTube: its own endpoints answer LOGIN_REQUIRED to every client, and the public mirrors are
- * gone, so the alternative to this process was no mainstream catalogue at all.
+ * The only source that runs another program. Nothing else here reaches YouTube: its own endpoints
+ * answer LOGIN_REQUIRED to every client, and the public mirrors are gone, so the alternative to
+ * this process was no mainstream catalogue at all.
  *
  * <p>It searches YouTube Music rather than YouTube. Both are served by the same yt-dlp and the same
  * media, but a YouTube Music result is a song with an artist and an album attached, while a YouTube
  * result is whatever a channel uploaded under that name — and the artist is the half of the match
  * that decides whether this is the right recording; see docs/music-sources.md.
  *
- * <p>It is last because it is the slowest and the most fragile — YouTube changes what it serves and
- * a yt-dlp that is months old downloads metadata happily and then fails on the media with a 403.
- * The scheduled source check is what reports that.
+ * <p>Third on audio alone: the ~160 kbps Opus it serves is worth more than the 128 kbps MP3 the two
+ * sources below it hand over, and yt-dlp re-encodes it with ffmpeg at LAME V0 rather than through
+ * this project's transcoder. That ranking costs time on every miss above it — a search and five
+ * extractions run before the chain moves on — and YouTube refuses datacenter addresses, so a
+ * deployment that is blocked pays that before reaching SoundCloud. Moving this back to the end of
+ * the chain is a one-line change to the order below.
+ *
+ * <p>It is also the most fragile: YouTube changes what it serves and a yt-dlp that is months old
+ * downloads metadata happily and then fails on the media with a 403. The scheduled source check is
+ * what reports that.
  */
 @Component
-@Order(9)
+@Order(3)
 public class YtDlpTrackSource implements TrackSource {
 
   private static final Logger log = LoggerFactory.getLogger(YtDlpTrackSource.class);
