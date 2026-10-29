@@ -112,8 +112,13 @@ extracts the MP3 itself rather than handing AAC to the transcoder here.
 download-maven-plugin fetches them at `prepare-package` into `/usr/local/bin`, which jib copies into
 the image and marks executable. That directory is already on `PATH`, so the application finds
 `yt-dlp` under its default configuration and yt-dlp finds ffmpeg without `--ffmpeg-location`. The
-ffmpeg binary is `ffmpeg-musl-forge`'s fully static musl build: the glibc-linked BtbN and Jellyfin
-builds do not start on this Alpine base image. FFmpeg 9 also stopped embedding the literal
+image's ffmpeg is `devenvy/ffmpeg`'s musl build, unpacked with the libav* shared libraries it loads
+through its `$ORIGIN` runpath. The tests download the same release's glibc build, because the CI
+runner is glibc and the hosted images no longer carry ffmpeg. Both builds pass
+`-Wl,-z,stack-size=8388608`, which is not optional: ffmpeg demuxes MPEG-TS on a worker thread and
+`pmt_cb()` copies a ~132 KB `struct Program` onto that stack, more than the 128 KB a musl build gets
+without the flag, so every recording segfaults. The glibc-linked BtbN and Jellyfin builds still do
+not start on this Alpine base image. FFmpeg 9 also stopped embedding the literal
 `%s version <version>` string the image scanner classifies on, so `src/main/jib-metadata/ffmpeg` is
 filtered into `/usr/local/share/song-radar/ffmpeg` with the pinned version. It is metadata only;
 removing it makes grype blind to the bundled ffmpeg. Two details are easy to get wrong: the base

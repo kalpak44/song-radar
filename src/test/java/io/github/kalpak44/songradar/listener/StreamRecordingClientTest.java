@@ -32,7 +32,20 @@ class StreamRecordingClientTest {
   @BeforeEach
   void setUp() throws IOException {
     server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-    client = new StreamRecordingClient("ffmpeg");
+    client = new StreamRecordingClient(ffmpeg());
+  }
+
+  /**
+   * The pinned glibc ffmpeg the build downloads for the tests; the image runs the same FFmpeg
+   * release built for musl. Falls back to PATH for an IDE run outside Maven.
+   */
+  private static String ffmpeg() {
+    String configured = System.getProperty("songradar.test.ffmpeg", "ffmpeg");
+    Path binary = Path.of(configured);
+    if (Files.isRegularFile(binary) && !binary.toFile().canExecute()) {
+      assertTrue(binary.toFile().setExecutable(true), "could not make " + binary + " executable");
+    }
+    return configured;
   }
 
   @AfterEach

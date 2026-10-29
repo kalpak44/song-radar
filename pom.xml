@@ -42,15 +42,20 @@
              stops. -->
         <ytdlp.version>2026.10.21</ytdlp.version>
         <ytdlp.sha256>d39487ff5c8eb1254d6f142bea05f495440d87ff529b2df786dcd3b5f66b23a8</ytdlp.sha256>
-        <!-- A fully static musl build, so it starts on the Alpine base image; the
-             glibc-linked builds from BtbN and Jellyfin do not. The publisher ships one
-             binary per release rather than a tarball, so the build still needs no
-             unpacking step. ffprobe is deliberately not bundled: it would add another
-             90 MB and audio extraction was verified to work without it. -->
+        <!-- Two builds of the same FFmpeg release: an Alpine/musl one for the image and
+             a glibc one for the tests, which run on the Ubuntu runner. Both come from
+             the same release and carry -Wl,-z,stack-size=8388608. That flag is not
+             optional: ffmpeg reads MPEG-TS on its demux thread, pmt_cb() copies a
+             ~132 KB struct Program onto that stack, and a musl build without the flag
+             gets only the 128 KB musl default and segfaults on every transport stream.
+             ffprobe is deliberately not put in the image: audio extraction was verified
+             to work without it. -->
         <ffmpeg.version>9.0.2</ffmpeg.version>
-        <ffmpeg.release>v9.0.2-12Oct26-c3e6b6071ce0</ffmpeg.release>
-        <ffmpeg.asset>ffmpeg-9.0.2-20261012-amd64</ffmpeg.asset>
-        <ffmpeg.sha256>0cbf5e656a2cf2e6f4f265f4a784e97f3812fcfd805599264ca3ab42956807be</ffmpeg.sha256>
+        <ffmpeg.release>9.0.2.12</ffmpeg.release>
+        <ffmpeg.image.asset>ffmpeg-9.0.2-linux-musl-x64-gplv2.tar.gz</ffmpeg.image.asset>
+        <ffmpeg.image.sha256>fd4b62766ef6cd1f0a4ff2d240676ab2040530a802d578fcf635df59546e89de</ffmpeg.image.sha256>
+        <ffmpeg.tests.asset>ffmpeg-9.0.2-linux-x64-gplv2.tar.gz</ffmpeg.tests.asset>
+        <ffmpeg.tests.sha256>a2e5f2df6733c801204be1f866b5cfdb9d0ce3224e463b1c45d73b7c95f76e66</ffmpeg.tests.sha256>
 
         <!-- The source checks reach the real music catalogues, so they are held out of the
              normal build and run on their own schedule. -->
@@ -160,6 +165,12 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <excludedGroups>${excluded.test.groups}</excludedGroups>
+                    <!-- The recording tests decode real transport streams with the pinned
+                         glibc ffmpeg above, so they do not depend on a hosted runner
+                         providing one on PATH (ubuntu-26.04 does not). -->
+                    <systemPropertyVariables>
+                        <songradar.test.ffmpeg>${project.build.directory}/ffmpeg-tests/ffmpeg</songradar.test.ffmpeg>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
 
@@ -226,9 +237,11 @@
             <!-- Builds the container image from target/classes with no Dockerfile, which
                  is why dependabot.yml has no `docker` entry: the base image is pinned
                  here and moves as a Maven property. -->
-            <!-- Fetches the two binaries the image ships. Bound to prepare-package so a
-                 plain `mvn test` does not pull 120 MB, and cached under ~/.m2 so CI pulls
-                 them once rather than once per run. -->
+            <!-- Fetches what the tests and the image run, cached under ~/.m2 so CI pulls
+                 each once rather than once per run. The test ffmpeg is the glibc build
+                 because the tests run on the Ubuntu runner; the image ffmpeg is the musl
+                 build because the base image is Alpine. Both archives also carry the
+                 libav* shared libraries the ffmpeg binary loads from its $ORIGIN. -->
             <plugin>
                 <groupId>com.googlecode.maven-download-plugin</groupId>
                 <artifactId>download-maven-plugin</artifactId>
@@ -248,16 +261,33 @@
                         </configuration>
                     </execution>
                     <execution>
-                        <id>fetch-ffmpeg</id>
+                        <id>fetch-ffmpeg-tests</id>
+                        <phase>process-test-resources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <uri>https://github.com/devenvy/ffmpeg/releases/download/${ffmpeg.release}/${ffmpeg.tests.asset}</uri>
+                            <outputDirectory>${project.build.directory}/ffmpeg-tests</outputDirectory>
+                            <outputFileName>${ffmpeg.tests.asset}</outputFileName>
+                            <sha256>${ffmpeg.tests.sha256}</sha256>
+                            <unpack>true</unpack>
+                            <unpackWhenChanged>true</unpackWhenChanged>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>fetch-ffmpeg-image</id>
                         <phase>prepare-package</phase>
                         <goals>
                             <goal>wget</goal>
                         </goals>
                         <configuration>
-                            <uri>https://github.com/start-the-fire/ffmpeg-musl-forge/releases/download/${ffmpeg.release}/${ffmpeg.asset}</uri>
-                            <outputDirectory>${project.build.directory}/jib-extra/usr/local/bin</outputDirectory>
-                            <outputFileName>ffmpeg</outputFileName>
-                            <sha256>${ffmpeg.sha256}</sha256>
+                            <uri>https://github.com/devenvy/ffmpeg/releases/download/${ffmpeg.release}/${ffmpeg.image.asset}</uri>
+                            <outputDirectory>${project.build.directory}/ffmpeg-image</outputDirectory>
+                            <outputFileName>${ffmpeg.image.asset}</outputFileName>
+                            <sha256>${ffmpeg.image.sha256}</sha256>
+                            <unpack>true</unpack>
+                            <unpackWhenChanged>true</unpackWhenChanged>
                         </configuration>
                     </execution>
                 </executions>
@@ -314,14 +344,40 @@
                         </platforms>
                     </from>
                     <!-- /usr/local/bin is already on PATH, so yt-dlp finds ffmpeg and the
-                         application finds yt-dlp under its default configuration. The
-                         files are put there by download-maven-plugin at prepare-package;
-                         `mvn package` is what fills this directory. -->
+                         application finds yt-dlp under its default configuration. yt-dlp
+                         lands in jib-extra and the ffmpeg distribution in ffmpeg-image,
+                         both filled by download-maven-plugin at prepare-package. The
+                         ffmpeg binary loads its libav* libraries from $ORIGIN, so they
+                         are copied beside it. -->
                     <extraDirectories>
                         <paths>
                             <path>
                                 <from>${project.build.directory}/jib-extra</from>
                                 <into>/</into>
+                            </path>
+                            <path>
+                                <from>${project.build.directory}/ffmpeg-image</from>
+                                <into>/usr/local/bin</into>
+                                <includes>
+                                    <include>ffmpeg</include>
+                                    <!-- Jib copies a followed symlink's contents, so
+                                         naming only the SONAME keeps one copy of each
+                                         library instead of three. -->
+                                    <include>libavcodec.so.63</include>
+                                    <include>libavdevice.so.63</include>
+                                    <include>libavfilter.so.12</include>
+                                    <include>libavformat.so.63</include>
+                                    <include>libavutil.so.61</include>
+                                    <include>libswresample.so.7</include>
+                                    <include>libswscale.so.10</include>
+                                </includes>
+                            </path>
+                            <path>
+                                <from>${project.build.directory}/ffmpeg-image</from>
+                                <into>/usr/local/share/doc/song-radar/ffmpeg</into>
+                                <includes>
+                                    <include>THIRD-PARTY-NOTICES.txt</include>
+                                </includes>
                             </path>
                         </paths>
                         <permissions>
