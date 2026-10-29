@@ -106,21 +106,16 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Declared before jcodec on purpose. jcodec bundles a stripped copy of these same
-             net.sourceforge.jaad classes with no SBR, which decodes HE-AAC without its high
-             band — audibly dull, and no length or format check can see it. This build has the
-             same API, so jcodec's own decoder keeps working against it. -->
+        <!-- Decodes the AAC a music source serves so the transcoder can re-encode it. It does
+             not decode recordings: it answers frames it cannot handle with a buffer of zeros and
+             no error, which is silence no check on the file can see, and ffmpeg decodes those
+             instead. Measured blanking rises as the bitrate falls — 0.4% at 320 kbps, 7.9% at
+             160 kbps — so the AAC paths below are ranked under the ones that need no decode.
+             See docs/recording.md. -->
         <dependency>
             <groupId>com.gitlab.9lukas5</groupId>
             <artifactId>jaad</artifactId>
             <version>0.8.8</version>
-        </dependency>
-
-        <!-- Decode MPEG-TS/AAC HLS segments in-process; recordings are persisted as WAV. -->
-        <dependency>
-            <groupId>org.jcodec</groupId>
-            <artifactId>jcodec</artifactId>
-            <version>0.2.5</version>
         </dependency>
 
         <!-- Pure-Java LAME. Library downloads arrive as AAC and the image carries no

@@ -4,25 +4,33 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
-import net.sourceforge.jaad.aac.AACException;
-import org.jcodec.codecs.aac.AACDecoder;
-import org.jcodec.common.AudioFormat;
-import org.jcodec.common.model.AudioBuffer;
+import java.util.concurrent.TimeUnit;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/** Captures HLS audio and decodes MPEG-TS/AAC to WAV without launching a process. */
+/**
+ * Captures HLS audio and decodes it to WAV.
+ *
+ * <p>The segments are fetched here rather than handed to ffmpeg as a URL: this keeps the stream
+ * restricted to HTTP, rejects encrypted playlists and bounds what a playlist can ask for, none of
+ * which survives passing a listener's own URL to a program that speaks a dozen other protocols.
+ * What ffmpeg is given is a local file this process wrote. See docs/recording.md.
+ */
 @Component
 public class StreamRecordingClient {
 
@@ -30,6 +38,24 @@ public class StreamRecordingClient {
   private static final int MAX_PLAYLIST_BYTES = 2 * 1024 * 1024;
   private static final int CONNECT_TIMEOUT_MILLIS = 10_000;
   private static final int READ_TIMEOUT_MILLIS = 15_000;
+
+  /** Generous for a decode that reads a local file, short enough that a hang is not a stall. */
+  private static final int DECODE_TIMEOUT_SECONDS = 120;
+
+  private static final int RIFF = 0x46464952;
+  private static final int WAVE = 0x45564157;
+  private static final int FMT = 0x20746d66;
+  private static final int DATA = 0x61746164;
+
+  private final String ffmpeg;
+
+  /**
+   * Hyphen-free property name so the container can set it as SONGRADAR_RECORDING_FFMPEG. The image
+   * already carries ffmpeg on PATH for yt-dlp, so the default needs no configuration.
+   */
+  public StreamRecordingClient(@Value("${songradar.recording.ffmpeg:ffmpeg}") String ffmpeg) {
+    this.ffmpeg = ffmpeg == null || ffmpeg.isBlank() ? "ffmpeg" : ffmpeg.trim();
+  }
 
   public Capture capture(URI stream, Path directory, String stem, Duration duration)
       throws IOException {
@@ -233,179 +259,138 @@ public class StreamRecordingClient {
     return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
   }
 
-  private static long decodeToWav(Path transport, Path wav, Duration duration) throws IOException {
-    byte[] aac = extractAac(transport);
-    int cursor = nextAdtsFrame(aac, 0);
-    if (cursor < 0) throw new IOException("the MPEG-TS stream has no ADTS AAC audio track");
-    int firstLength = adtsFrameLength(aac, cursor);
-    if (firstLength < 7 || cursor + firstLength > aac.length)
-      throw new IOException("the MPEG-TS stream contains an incomplete AAC frame");
-    AACDecoder decoder;
+  /**
+   * ffmpeg decodes, rather than this process. The in-process AAC decoder this replaced answered
+   * frames it could not handle with a full-length buffer of zeros and no error, so a recording came
+   * back exactly the right length with holes punched through it and nothing here could tell. On the
+   * same bitstream it blanked 3.7% of frames at 128 kbps and 42% at 96 kbps, all of which ffmpeg
+   * decodes in full. See docs/recording.md.
+   */
+  private long decodeToWav(Path transport, Path wav, Duration duration) throws IOException {
+    List<String> command =
+        List.of(
+            ffmpeg,
+            // Never prompt and never read this process's stdin: a decode runs unattended,
+            // and ffmpeg asks before overwriting.
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            transport.toString(),
+            "-vn",
+            // Stream artwork and timed metadata have no place in a recording the
+            // fingerprinter reads as plain PCM.
+            "-map_metadata",
+            "-1",
+            "-t",
+            // Root locale: a comma decimal separator is not a duration to ffmpeg.
+            String.format(Locale.ROOT, "%.3f", duration.toMillis() / 1000.0),
+            "-c:a",
+            "pcm_s16le",
+            "-f",
+            "wav",
+            wav.toString());
+    runFfmpeg(command);
+    if (!Files.isRegularFile(wav)) {
+      throw new IOException("ffmpeg produced no audio file");
+    }
+    return wavDurationMillis(wav);
+  }
+
+  /**
+   * Arguments are passed as a list, never through a shell: the only one that is not a constant is a
+   * path this process chose, and quoting it into a command line would be an injection.
+   */
+  private void runFfmpeg(List<String> command) throws IOException {
+    Process process;
     try {
-      decoder = new AACDecoder(ByteBuffer.wrap(aac, cursor, firstLength).slice());
-    } catch (AACException e) {
-      throw new IOException("the MPEG-TS AAC stream could not be initialized", e);
+      process = new ProcessBuilder(command).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+    } catch (IOException exception) {
+      // A missing binary is a deployment fault, not a bad stream, and reads as neither
+      // unless it is said plainly.
+      throw new IOException(
+          "ffmpeg could not be run as \"" + ffmpeg + "\"; recordings cannot be decoded without it",
+          exception);
     }
-    try (RandomAccessFile output = new RandomAccessFile(wav.toFile(), "rw")) {
-      output.write(new byte[44]);
-      AudioFormat format = null;
-      int sampleRate = 0, channels = 0;
-      long maxBytes = Long.MAX_VALUE, dataBytes = 0;
-      while (cursor >= 0 && cursor + 7 <= aac.length) {
-        int frameLength = adtsFrameLength(aac, cursor);
-        if (frameLength < 7 || cursor + frameLength > aac.length) break;
-        AudioBuffer decoded =
-            decoder.decodeFrame(ByteBuffer.wrap(aac, cursor, frameLength).slice(), null);
-        if (decoded != null) {
-          if (format == null) {
-            format = decoded.getFormat();
-            if (!format.isSigned() || format.getSampleSizeInBits() != 16)
-              throw new IOException("the AAC decoder returned an unsupported PCM format");
-            channels = format.getChannels();
-            sampleRate = format.getSampleRate();
-            int bps = Math.multiplyExact(Math.multiplyExact(sampleRate, channels), 2);
-            maxBytes = Math.multiplyExact((long) bps, duration.toMillis()) / 1000;
+    try {
+      // Waited on before its output is read: reading to end of stream first would block for as
+      // long as a hung ffmpeg stays alive, and the timeout below would never come due. Safe in
+      // this order only because --loglevel error cannot fill the pipe it is buffered in.
+      if (!process.waitFor(DECODE_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        throw new IOException("ffmpeg did not finish within " + DECODE_TIMEOUT_SECONDS + "s");
+      }
+      String error =
+          new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8).trim();
+      if (process.exitValue() != 0) {
+        throw new IOException(
+            "ffmpeg could not decode the stream"
+                + (error.isEmpty() ? "" : ": " + error.lines().findFirst().orElse(error)));
+      }
+    } catch (InterruptedException exception) {
+      Thread.currentThread().interrupt();
+      process.destroyForcibly();
+      throw new IOException("interrupted while waiting for ffmpeg", exception);
+    }
+  }
+
+  /**
+   * Read from the file rather than from what was asked for: a stream that ended early gives ffmpeg
+   * less than the requested duration, and the recording is as long as the audio in it.
+   */
+  private static long wavDurationMillis(Path wav) throws IOException {
+    try (SeekableByteChannel channel = Files.newByteChannel(wav, StandardOpenOption.READ)) {
+      long size = channel.size();
+      ByteBuffer header = read(channel, 0, 12);
+      if (header == null || header.getInt(0) != RIFF || header.getInt(8) != WAVE) {
+        throw new IOException("ffmpeg did not return a RIFF/WAVE recording");
+      }
+      int channels = 0;
+      int sampleRate = 0;
+      int bitsPerSample = 0;
+      long dataBytes = 0;
+      long cursor = 12;
+      while (cursor + 8 <= size) {
+        ByteBuffer chunk = read(channel, cursor, 8);
+        if (chunk == null) {
+          break;
+        }
+        long length = Integer.toUnsignedLong(chunk.getInt(4));
+        long body = cursor + 8;
+        if (chunk.getInt(0) == FMT && length >= 16) {
+          ByteBuffer format = read(channel, body, 16);
+          if (format != null) {
+            channels = format.getShort(2) & 0xffff;
+            sampleRate = format.getInt(4);
+            bitsPerSample = format.getShort(14) & 0xffff;
           }
-          dataBytes += writePcm(output, decoded, maxBytes - dataBytes, format);
-          if (dataBytes >= maxBytes) break;
+        } else if (chunk.getInt(0) == DATA) {
+          // Trust the file over the header: a decode that stopped mid-write still has a
+          // usable prefix, and the declared length would then overstate it.
+          dataBytes = Math.min(length, size - body);
         }
-        cursor = nextAdtsFrame(aac, cursor + frameLength);
+        cursor = body + length + (length & 1);
       }
-      if (format == null || dataBytes == 0)
-        throw new IOException("the MPEG-TS stream contains no decodable AAC audio");
-      writeWavHeader(output, sampleRate, channels, dataBytes);
-      return dataBytes * 1000 / (sampleRate * channels * 2L);
-    } catch (ArithmeticException e) {
-      throw new IOException("recording duration is too large", e);
-    } catch (Exception e) {
-      if (e instanceof IOException io) throw io;
-      throw new IOException("the MPEG-TS AAC audio could not be decoded", e);
-    }
-  }
-
-  private static byte[] extractAac(Path transport) throws IOException {
-    byte[] ts = Files.readAllBytes(transport);
-    ByteArrayOutputStream audio = new ByteArrayOutputStream();
-    int pmtPid = -1, audioPid = -1;
-    for (int offset = 0; offset + 188 <= ts.length; ) {
-      if ((ts[offset] & 0xff) != 0x47) {
-        offset++;
-        continue;
+      long bytesPerSecond = (long) sampleRate * channels * (bitsPerSample / 8);
+      if (bytesPerSecond <= 0) {
+        throw new IOException("the recording has no readable audio format");
       }
-      int pid = ((ts[offset + 1] & 0x1f) << 8) | (ts[offset + 2] & 0xff);
-      boolean start = (ts[offset + 1] & 0x40) != 0;
-      int control = (ts[offset + 3] >> 4) & 3;
-      int payload = offset + 4;
-      if ((control & 2) != 0) payload += 1 + (ts[payload] & 0xff);
-      int end = offset + 188;
-      if ((control & 1) != 0 && payload < end) {
-        if (pid == 0 && start) {
-          int section = psiSectionStart(ts, payload, end);
-          if (section >= 0 && (ts[section] & 0xff) == 0) pmtPid = parsePatForPmt(ts, section, end);
-        } else if (pid == pmtPid && start) {
-          int section = psiSectionStart(ts, payload, end);
-          if (section >= 0 && (ts[section] & 0xff) == 2)
-            audioPid = parsePmtForAac(ts, section, end);
-        } else if (pid == audioPid && audioPid >= 0) {
-          if (start
-              && payload + 9 <= end
-              && ts[payload] == 0
-              && ts[payload + 1] == 0
-              && ts[payload + 2] == 1) payload += 9 + (ts[payload + 8] & 0xff);
-          if (payload < end) audio.write(ts, payload, end - payload);
-        }
-      }
-      offset += 188;
+      return dataBytes * 1000 / bytesPerSecond;
     }
-    if (audioPid < 0)
-      throw new IOException("the MPEG-TS stream has no AAC audio elementary stream");
-    return audio.toByteArray();
   }
 
-  private static int psiSectionStart(byte[] bytes, int payload, int end) {
-    int section = payload + 1 + (bytes[payload] & 0xff);
-    return section < end ? section : -1;
-  }
-
-  private static int parsePatForPmt(byte[] b, int s, int end) {
-    if (s + 8 > end) return -1;
-    int stop = Math.min(end, s + 3 + (((b[s + 1] & 15) << 8) | (b[s + 2] & 255)) - 4);
-    for (int i = s + 8; i + 4 <= stop; i += 4) {
-      int program = ((b[i] & 255) << 8) | (b[i + 1] & 255);
-      if (program != 0) return ((b[i + 2] & 31) << 8) | (b[i + 3] & 255);
-    }
-    return -1;
-  }
-
-  private static int parsePmtForAac(byte[] b, int s, int end) throws IOException {
-    if (s + 12 > end) return -1;
-    int stop = Math.min(end, s + 3 + (((b[s + 1] & 15) << 8) | (b[s + 2] & 255)) - 4);
-    int i = s + 12 + (((b[s + 10] & 15) << 8) | (b[s + 11] & 255));
-    while (i + 5 <= stop) {
-      int type = b[i] & 255;
-      int pid = ((b[i + 1] & 31) << 8) | (b[i + 2] & 255);
-      int info = ((b[i + 3] & 15) << 8) | (b[i + 4] & 255);
-      if (type == 15) return pid;
-      if (type == 17)
-        throw new IOException("the MPEG-TS stream uses AAC LATM, which is not supported yet");
-      i += 5 + info;
-    }
-    return -1;
-  }
-
-  private static int nextAdtsFrame(byte[] b, int from) {
-    for (int i = Math.max(0, from); i + 7 <= b.length; i++)
-      if ((b[i] & 255) == 255 && (b[i + 1] & 0xf6) == 0xf0) return i;
-    return -1;
-  }
-
-  private static int adtsFrameLength(byte[] b, int i) {
-    if (i + 7 > b.length) return -1;
-    return ((b[i + 3] & 3) << 11) | ((b[i + 4] & 255) << 3) | ((b[i + 5] & 0xe0) >> 5);
-  }
-
-  private static long writePcm(
-      RandomAccessFile output, AudioBuffer buffer, long maxBytes, AudioFormat format)
+  private static ByteBuffer read(SeekableByteChannel channel, long position, int length)
       throws IOException {
-    if (buffer == null || maxBytes <= 0) {
-      return 0;
-    }
-    ByteBuffer pcm = buffer.getData().duplicate();
-    int count = (int) Math.min(pcm.remaining(), maxBytes);
-    count -= count % format.getFrameSize();
-    byte[] bytes = new byte[count];
-    pcm.get(bytes);
-    if (format.isBigEndian()) {
-      for (int index = 0; index + 1 < bytes.length; index += 2) {
-        byte high = bytes[index];
-        bytes[index] = bytes[index + 1];
-        bytes[index + 1] = high;
+    ByteBuffer buffer = ByteBuffer.allocate(length).order(ByteOrder.LITTLE_ENDIAN);
+    channel.position(position);
+    while (buffer.hasRemaining()) {
+      if (channel.read(buffer) < 0) {
+        return null;
       }
     }
-    output.write(bytes);
-    return count;
-  }
-
-  private static void writeWavHeader(
-      RandomAccessFile file, int sampleRate, int channels, long dataBytes) throws IOException {
-    if (dataBytes > 0xffff_ffffL - 36) {
-      throw new IOException("recording is too large for a WAV file");
-    }
-    ByteBuffer header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN);
-    header.put("RIFF".getBytes(StandardCharsets.US_ASCII));
-    header.putInt((int) (36 + dataBytes));
-    header.put("WAVEfmt ".getBytes(StandardCharsets.US_ASCII));
-    header.putInt(16);
-    header.putShort((short) 1);
-    header.putShort((short) channels);
-    header.putInt(sampleRate);
-    header.putInt(sampleRate * channels * 2);
-    header.putShort((short) (channels * 2));
-    header.putShort((short) 16);
-    header.put("data".getBytes(StandardCharsets.US_ASCII));
-    header.putInt((int) dataBytes);
-    file.seek(0);
-    file.write(header.array());
+    return buffer;
   }
 
   public record Capture(Path path, long durationMillis) {}
