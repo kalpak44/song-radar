@@ -136,16 +136,22 @@
                                     <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-400/10 text-amber-300"><svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.75A1.75 1.75 0 0 1 4.75 4h5.02c.46 0 .9.18 1.23.51l1.26 1.24h7A1.75 1.75 0 0 1 21 7.5v10.75A1.75 1.75 0 0 1 19.25 20H4.75A1.75 1.75 0 0 1 3 18.25z"/></svg></span>
                                     <span class="truncate" th:text="${file.name}">folder</span>
                                 </a>
-                                <div th:unless="${file.directory}" class="flex min-w-0 items-center gap-3">
-                                    <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-800 text-slate-400"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span>
-                                <div class="min-w-0">
+                                <div th:unless="${file.directory}" class="flex min-w-0 items-center gap-3"
+                                     th:attr="data-row-player=${file.playable} ? 'true' : null">
+                                    <!-- The file icon is the play button. A separate one beside it read as a second
+                                         control for the same track, which is what it looked like. -->
+                                    <button th:if="${file.playable}" type="button" data-row-toggle aria-pressed="false"
+                                            th:attr="aria-label='Play ' + ${file.name}"
+                                            class="grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg bg-slate-800 text-slate-300 transition hover:bg-emerald-400 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-emerald-300 aria-pressed:bg-emerald-400 aria-pressed:text-slate-950">
+                                        <svg data-row-icon class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.5-.86l11 6.5a1 1 0 0 1 0 1.72l-11 6.5A1 1 0 0 1 7 17.5z"/></svg>
+                                    </button>
+                                    <span th:unless="${file.playable}" class="grid size-9 shrink-0 place-items-center rounded-lg bg-slate-800 text-slate-500"><svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M7 4h7l4 4v12H7z"/><path d="M14 4v4h4"/></svg></span>
+                                    <audio th:if="${file.playable}" data-row-audio preload="none" th:src="@{/files/audio(path=${file.relativePath})}" class="hidden"></audio>
+                                    <div class="min-w-0 flex-1">
                                         <a th:href="@{/files/download(path=${file.relativePath})}" th:text="${file.name}" class="block truncate font-medium text-slate-200 hover:text-emerald-300">file.mp3</a>
-                                        <div th:if="${file.playable}" data-row-player class="mt-2 flex max-w-[20rem] items-center gap-2">
-                                            <audio data-row-audio preload="none" th:src="@{/files/audio(path=${file.relativePath})}" class="hidden"></audio>
-                                            <button type="button" data-row-toggle th:attr="aria-label='Play ' + ${file.name}"
-                                                    class="grid size-7 shrink-0 cursor-pointer place-items-center rounded-full bg-slate-800 text-slate-200 transition hover:bg-emerald-400 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-emerald-300">
-                                                <svg data-row-icon class="size-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5a1 1 0 0 1 1.5-.86l11 6.5a1 1 0 0 1 0 1.72l-11 6.5A1 1 0 0 1 7 17.5z"/></svg>
-                                            </button>
+                                        <!-- A fixed width, not one the filename decides: a row of bars that each
+                                             stop somewhere different reads as each track having a different length. -->
+                                        <div th:if="${file.playable}" class="mt-2 flex w-80 max-w-full items-center gap-2">
                                             <input type="range" data-row-seek min="0" max="0" value="0" step="any" disabled
                                                    th:attr="aria-label='Seek within ' + ${file.name}"
                                                    class="min-w-0 flex-1 cursor-pointer accent-emerald-400 disabled:cursor-not-allowed disabled:opacity-40">
@@ -319,7 +325,10 @@
                 wireSeek(audio, row.querySelector('[data-row-seek]'), (at, length) => {
                     time.textContent = `${clock(at)} / ${clock(length)}`;
                 });
-                const paint = () => { icon.innerHTML = audio.paused ? PLAY_ICON : PAUSE_ICON; };
+                const paint = () => {
+                    icon.innerHTML = audio.paused ? PLAY_ICON : PAUSE_ICON;
+                    toggle.setAttribute('aria-pressed', String(!audio.paused));
+                };
                 toggle.addEventListener('click', () => {
                     if (audio.paused) audio.play().catch(() => { time.textContent = 'unplayable'; });
                     else audio.pause();
