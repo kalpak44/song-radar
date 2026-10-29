@@ -31,6 +31,45 @@
             </div>
         </section>
 
+        <section class="mt-5 rounded-2xl border border-slate-800/90 bg-slate-900/25 p-5 sm:p-6">
+            <div class="flex flex-wrap items-end justify-between gap-4">
+                <div class="min-w-0">
+                    <h2 class="text-sm font-medium text-slate-100">Import from YouTube Music</h2>
+                    <p class="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                        Paste a track or playlist link. Every track is named from YouTube Music, then looked for across
+                        all sources — best audio first — and saved to
+                        <span class="font-mono text-slate-400" th:text="${importFolder}">YouTube Music</span> in the library.
+                    </p>
+                </div>
+                <p class="font-mono text-[0.68rem] text-slate-500" th:text="|at most ${importMaxTracks} tracks|">at most 100 tracks</p>
+            </div>
+            <form method="post" th:action="@{/detections/import}" class="mt-4 flex flex-wrap items-center gap-2">
+                <input name="url" type="url" required maxlength="2000"
+                       placeholder="https://music.youtube.com/watch?v=…&amp;list=…"
+                       aria-label="YouTube Music track or playlist link"
+                       class="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none">
+                <button type="submit" th:disabled="${importProgress != null and importProgress.running}"
+                        class="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-40">
+                    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg>
+                    Import
+                </button>
+            </form>
+
+            <div th:if="${importProgress != null}" class="mt-4 rounded-xl border border-slate-800 bg-slate-950/50 px-4 py-3">
+                <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span th:classappend="${importProgress.running} ? 'text-sky-200' : 'text-slate-300'"
+                          th:text="${importProgress.message}">Downloading…</span>
+                    <span class="font-mono text-slate-500"
+                          th:text="${importProgress.total > 0} ? |${importProgress.done} / ${importProgress.total} · ${importProgress.saved} saved| : ''">0 / 0</span>
+                </div>
+                <div th:if="${importProgress.total > 0}" class="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800">
+                    <div class="h-full rounded-full bg-emerald-400 transition-[width]"
+                         th:style="'width:' + ${#numbers.formatDecimal(importProgress.done * 100.0 / importProgress.total, 1, 0)} + '%'"></div>
+                </div>
+                <p class="mt-2 truncate font-mono text-[0.68rem] text-slate-600" th:text="${importProgress.url}"></p>
+            </div>
+        </section>
+
         <div th:unless="${configured}" role="status" class="mt-5 rounded-xl border border-amber-900/60 bg-amber-950/25 px-4 py-3 text-sm leading-6 text-amber-100/90">
             Recognition is not configured yet. Set <code class="rounded bg-black/30 px-1.5 py-0.5 font-mono text-amber-200">SONGRADAR_AUDD_API_TOKEN</code> to identify new recordings. AudD offers a limited free trial; requests beyond it may require a paid plan.
         </div>

@@ -66,12 +66,12 @@ public class SourcedMusicDownloader implements MusicDownloader {
   }
 
   @Override
-  public void download(SoundDetection detection, Path destinationFolder) {
+  public boolean download(SoundDetection detection, Path destinationFolder) {
     String artist = cleanPart(detection.artist());
     String title = cleanPart(detection.title());
     if (artist.isBlank() && title.isBlank()) {
       log.info("Detection {} has no artist or title to search for", detection.id());
-      return;
+      return false;
     }
     Path target = destinationFolder.resolve(fileName(detection, artist, title)).normalize();
     // The folder is named for the listener that recorded the track, which is the only place
@@ -107,7 +107,7 @@ public class SourcedMusicDownloader implements MusicDownloader {
             track,
             found.get().source(),
             "Saved as " + target.getFileName());
-        return;
+        return true;
       } catch (IOException | RuntimeException exception) {
         log.info(
             "{} matched \"{} - {}\" but could not deliver it: {}",
@@ -126,6 +126,35 @@ public class SourcedMusicDownloader implements MusicDownloader {
     log.info("No source had \"{} - {}\"", artist, title);
     activity.record(
         ActivityKind.UNAVAILABLE, listener, track, null, "No source could deliver this track");
+    return false;
+  }
+
+  @Override
+  public boolean save(SourceTrack track, Path destinationFolder, String artist, String title) {
+    String safeArtist = cleanPart(artist);
+    String safeTitle = cleanPart(title);
+    String listener = String.valueOf(destinationFolder.getFileName());
+    String named = safeArtist.isBlank() ? safeTitle : safeArtist + " - " + safeTitle;
+    Path target =
+        destinationFolder
+            .resolve((named.isBlank() ? "track-" + System.nanoTime() : named) + ".mp3")
+            .normalize();
+    try {
+      store(track, target, safeArtist, safeTitle);
+      log.info("Saved \"{}\" from {} to {}", named, track.source(), target);
+      activity.record(
+          ActivityKind.SAVED, listener, named, track.source(), "Saved as " + target.getFileName());
+      return true;
+    } catch (IOException | RuntimeException exception) {
+      log.info("{} could not deliver \"{}\": {}", track.source(), named, exception.toString());
+      activity.record(
+          ActivityKind.UNAVAILABLE,
+          listener,
+          named,
+          track.source(),
+          "Could not deliver this track: " + reason(exception));
+      return false;
+    }
   }
 
   /**

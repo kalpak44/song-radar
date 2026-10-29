@@ -3,6 +3,8 @@ package io.github.kalpak44.songradar.web;
 import io.github.kalpak44.songradar.detection.SoundDetectionService;
 import io.github.kalpak44.songradar.detection.SoundDetectionService.DownloadPlanResult;
 import io.github.kalpak44.songradar.detection.SoundDetectionService.ManualAttemptResult;
+import io.github.kalpak44.songradar.library.PlaylistImportService;
+import io.github.kalpak44.songradar.library.PlaylistImportService.ImportRequest;
 import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
 import org.springframework.stereotype.Controller;
@@ -19,11 +21,15 @@ public class SoundDetectionController {
 
   private final SoundDetectionService service;
   private final ListenerRecordingRepository recordings;
+  private final PlaylistImportService imports;
 
   public SoundDetectionController(
-      SoundDetectionService service, ListenerRecordingRepository recordings) {
+      SoundDetectionService service,
+      ListenerRecordingRepository recordings,
+      PlaylistImportService imports) {
     this.service = service;
     this.recordings = recordings;
+    this.imports = imports;
   }
 
   @GetMapping("/detections")
@@ -39,7 +45,36 @@ public class SoundDetectionController {
     model.addAttribute("total", total);
     model.addAttribute("currentPage", current);
     model.addAttribute("totalPages", pages);
+    model.addAttribute("importProgress", imports.progress().orElse(null));
+    model.addAttribute("importFolder", PlaylistImportService.FOLDER);
+    model.addAttribute("importMaxTracks", imports.maxTracks());
     return "detections";
+  }
+
+  /**
+   * Returns while the import is still running. It is minutes of downloading, so the page reports
+   * where it got to and the activity feed carries the detail.
+   */
+  @PostMapping("/detections/import")
+  public String importLink(
+      @RequestParam(defaultValue = "") String url,
+      org.springframework.web.servlet.mvc.support.RedirectAttributes redirect) {
+    ImportRequest result = imports.start(url);
+    switch (result) {
+      case STARTED ->
+          redirect.addFlashAttribute(
+              "successMessage",
+              "Reading that link. Tracks are saved to the "
+                  + PlaylistImportService.FOLDER
+                  + " folder as they arrive — reload to see how far it has got.");
+      case INVALID_LINK ->
+          redirect.addFlashAttribute(
+              "errorMessage", "That is not a YouTube Music link. Paste a track or playlist URL.");
+      case ALREADY_RUNNING ->
+          redirect.addFlashAttribute(
+              "errorMessage", "An import is already running. Wait for it to finish.");
+    }
+    return "redirect:/detections";
   }
 
   @PostMapping("/recordings/{recordingId}/detect")

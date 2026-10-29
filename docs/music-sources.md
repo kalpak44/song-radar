@@ -41,6 +41,33 @@ decoder behind it also blanks frames it cannot handle — 0.4% at 320 kbps, 2.4%
 160 kbps — which is why the sources that need no decode are ranked above the ones that do. See
 docs/recording.md for what that decoder does and how it was measured.
 
+## Importing a YouTube Music link
+
+The detections page takes a track or playlist URL and fills `library/YouTube Music/` from it.
+`PlaylistImportService` runs it on its own single thread; the request returns immediately, because
+an import is minutes of downloading and the page is reloaded to see how far it has got.
+
+**The link only says which songs are wanted, not where to get them.** Each one is still searched
+for through the chain above, so a track Audius carries at 320 kbps comes from there rather than
+from the link it arrived on. Only when no catalogue can place it by name is the exact video behind
+the link downloaded — the one case where searching could quietly substitute a different recording.
+
+**A limit is not a formality here.** A YouTube Music link that carries an `RDAMVM` list is an
+endless radio mix rather than a playlist: the one this was written against resolved to **2,197
+entries**. `SONGRADAR_LIBRARY_IMPORT_MAX_TRACKS` caps it, defaulting to 100.
+
+**A track is named after its performer, not its credits.** YouTube Music lists the songwriters
+alongside the artist and yt-dlp joins the lot, so the first track tried here came back as
+`ЗОМБ, Трегубов Семён Александрович`. That is a filename nobody wants, and worse, three extra words
+the matcher looks for in every candidate — enough to push a correct one under the threshold. The
+first entry of yt-dlp's `artists` is used instead; measured against the same link, the track that
+no catalogue could place before was placed after. An upload with no music metadata at all falls
+back to the channel, with a trailing ` - Topic` removed, and those names stay as untidy as the
+upload is.
+
+**Only YouTube's own hosts are accepted.** The link is handed to a program that will fetch whatever
+it is given, and anyone who can reach the page can start an import.
+
 ## What breaks, and where to look
 
 **SoundCloud needs a `client_id` that is published nowhere.** It is scraped out of the site's own

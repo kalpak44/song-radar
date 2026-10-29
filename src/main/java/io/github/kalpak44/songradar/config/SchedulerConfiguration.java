@@ -22,6 +22,21 @@ public class SchedulerConfiguration {
     return scheduler;
   }
 
+  /**
+   * One thread, and a queue of one: an import is a long run of downloads, and two of them at once
+   * would compete for the same yt-dlp and the same bandwidth rather than finish any sooner.
+   */
+  @Bean("importTaskExecutor")
+  TaskExecutor importTaskExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(1);
+    executor.setMaxPoolSize(1);
+    executor.setQueueCapacity(1);
+    executor.setThreadNamePrefix("songradar-import-");
+    executor.setWaitForTasksToCompleteOnShutdown(false);
+    return executor;
+  }
+
   @Bean("recognitionTaskExecutor")
   TaskExecutor recognitionTaskExecutor(
       @Value("${songradar.recognition.worker-threads:1}") int threadCount) {

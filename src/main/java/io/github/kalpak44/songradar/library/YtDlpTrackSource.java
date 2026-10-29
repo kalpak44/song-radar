@@ -118,6 +118,67 @@ public class YtDlpTrackSource implements TrackSource {
   }
 
   /**
+   * The tracks a YouTube Music link stands for: one for a track, the whole listing for a playlist.
+   *
+   * <p>A link is resolved in two passes because the two shapes answer differently. A bare track URL
+   * extracts in full and already carries the artist and the song title. A playlist URL is listed
+   * flat — an id and whatever YouTube shows in the row, which for a song is the uploading channel
+   * rather than the performer — so those are extracted afterwards for the real names.
+   *
+   * <p>{@code limit} is not a formality. A YouTube Music link that carries a {@code RDAMVM} list is
+   * an endless radio mix rather than a playlist: the one this was written against resolved to 2,197
+   * entries, which is a download measured in days.
+   */
+  public List<ImportedTrack> tracksAt(String url, int limit) throws IOException {
+    List<Entry> listed =
+        parse(
+            run(
+                    SEARCH_TIMEOUT_SECONDS,
+                    executable,
+                    "--no-warnings",
+                    "--flat-playlist",
+                    "--playlist-end",
+                    String.valueOf(Math.max(1, limit)),
+                    "--dump-json",
+                    url)
+                .succeededOrThrow());
+    List<Entry> songs =
+        listed.stream().filter(entry -> entry.id() != null && !entry.isContainer()).toList();
+    if (songs.isEmpty()) {
+      return List.of();
+    }
+    // Already extracted in full when the link was a single track; describing it again would be a
+    // second round trip for metadata that is in hand.
+    List<Entry> described =
+        songs.size() == 1 && songs.getFirst().artist() != null
+            ? songs
+            : describe(songs.stream().map(Entry::id).toList());
+    return described.stream()
+        .filter(entry -> entry.id() != null && entry.heading() != null)
+        .map(entry -> new ImportedTrack(entry.id(), entry.heading(), entry.primaryArtist()))
+        .toList();
+  }
+
+  /**
+   * The track behind one YouTube Music id, with no searching and so no chance of a near miss. The
+   * importer falls back to this when the catalogues cannot place a track by name.
+   */
+  public Optional<SourceTrack> trackById(String id) {
+    try {
+      return describe(List.of(id)).stream()
+          .filter(entry -> entry.id() != null)
+          .findFirst()
+          .map(entry -> toSourceTrack(entry, ""));
+    } catch (IOException | RuntimeException exception) {
+      log.info("YouTube Music could not describe {}: {}", id, exception.toString());
+      return Optional.empty();
+    }
+  }
+
+  /** One track of an imported link, named as YouTube Music names it. */
+  public record ImportedTrack(String id, String title, String artist) {}
+
+  /**
    * Flat, because the search listing carries nothing that is scored here — a YouTube Music result
    * is a title and an id, and the artist and the length arrive only with the extraction below.
    */
@@ -288,9 +349,13 @@ public class YtDlpTrackSource implements TrackSource {
       String title,
       String track,
       String artist,
+      List<String> artists,
       String channel,
       Double duration,
       @JsonProperty("ie_key") String ieKey) {
+
+    /** A YouTube Music channel for a song is named for the artist with this appended. */
+    private static final String TOPIC = " - Topic";
 
     String heading() {
       return track == null ? title : track;
@@ -300,8 +365,35 @@ public class YtDlpTrackSource implements TrackSource {
       return artist == null ? channel : artist;
     }
 
+    /**
+     * The performer alone. YouTube Music lists the songwriters alongside them, and {@code artist}
+     * is all of those joined — "ЗОМБ, Трегубов Семён Александрович" for a track credited to ЗОМБ.
+     * That is a filename nobody wants and, worse, three extra words the matcher looks for in every
+     * candidate, which is enough to put a correct one under the threshold and lose the track to a
+     * catalogue that has it.
+     */
+    String primaryArtist() {
+      if (artists != null && !artists.isEmpty() && !artists.getFirst().isBlank()) {
+        return artists.getFirst().trim();
+      }
+      if (artist != null && !artist.isBlank()) {
+        return artist.trim();
+      }
+      if (channel == null) {
+        return null;
+      }
+      return channel.endsWith(TOPIC)
+          ? channel.substring(0, channel.length() - TOPIC.length()).trim()
+          : channel;
+    }
+
     long durationMillis() {
       return duration == null ? 0 : Math.round(duration * 1000);
+    }
+
+    /** An artist or album row, which extracts to a whole channel rather than to a song. */
+    boolean isContainer() {
+      return ieKey != null && !"Youtube".equals(ieKey);
     }
   }
 }

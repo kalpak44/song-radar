@@ -19,6 +19,9 @@ import io.github.kalpak44.songradar.detection.SoundDetection;
 import io.github.kalpak44.songradar.detection.SoundDetectionService;
 import io.github.kalpak44.songradar.detection.SoundDetectionService.DownloadPlanResult;
 import io.github.kalpak44.songradar.detection.SoundDetectionService.ManualAttemptResult;
+import io.github.kalpak44.songradar.library.PlaylistImportService;
+import io.github.kalpak44.songradar.library.PlaylistImportService.ImportProgress;
+import io.github.kalpak44.songradar.library.PlaylistImportService.ImportRequest;
 import io.github.kalpak44.songradar.listener.ListenerRecording;
 import io.github.kalpak44.songradar.listener.ListenerRecordingRepository;
 import io.github.kalpak44.songradar.listener.RecordingStatus;
@@ -45,9 +48,78 @@ class SoundDetectionControllerTest {
   @Autowired private MockMvc mockMvc;
   @MockitoBean private SoundDetectionService service;
   @MockitoBean private ListenerRecordingRepository recordings;
+  @MockitoBean private PlaylistImportService imports;
+
+  @Test
+  void offersTheImportFormAndStartsAnImportForAYouTubeMusicLink() throws Exception {
+    when(imports.progress()).thenReturn(Optional.empty());
+    when(imports.maxTracks()).thenReturn(100);
+    when(service.page(1, 30)).thenReturn(List.of());
+
+    mockMvc
+        .perform(get("/detections"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("Import from YouTube Music")))
+        .andExpect(content().string(containsString("/detections/import")))
+        .andExpect(model().attribute("importMaxTracks", 100));
+
+    when(imports.start("https://music.youtube.com/watch?v=abc&list=def"))
+        .thenReturn(ImportRequest.STARTED);
+
+    mockMvc
+        .perform(
+            post("/detections/import")
+                .param("url", "https://music.youtube.com/watch?v=abc&list=def"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(redirectedUrl("/detections"))
+        .andExpect(flash().attribute("successMessage", containsString("YouTube Music")));
+  }
+
+  @Test
+  void reportsALinkThatIsNotYouTubeMusicAndAnImportAlreadyRunning() throws Exception {
+    when(imports.start("https://example.com/stream")).thenReturn(ImportRequest.INVALID_LINK);
+    when(imports.start("https://music.youtube.com/watch?v=abc"))
+        .thenReturn(ImportRequest.ALREADY_RUNNING);
+
+    mockMvc
+        .perform(post("/detections/import").param("url", "https://example.com/stream"))
+        .andExpect(flash().attribute("errorMessage", containsString("not a YouTube Music link")));
+
+    mockMvc
+        .perform(post("/detections/import").param("url", "https://music.youtube.com/watch?v=abc"))
+        .andExpect(flash().attribute("errorMessage", containsString("already running")));
+  }
+
+  /**
+   * A running import is what the page is for while it waits; the button must not start a second.
+   */
+  @Test
+  void showsHowFarARunningImportHasGot() throws Exception {
+    when(service.page(1, 30)).thenReturn(List.of());
+    when(imports.maxTracks()).thenReturn(100);
+    when(imports.progress())
+        .thenReturn(
+            Optional.of(
+                new ImportProgress(
+                    true,
+                    "https://music.youtube.com/playlist?list=abc",
+                    20,
+                    7,
+                    6,
+                    "Downloading…",
+                    NOW)));
+
+    mockMvc
+        .perform(get("/detections"))
+        .andExpect(status().isOk())
+        .andExpect(content().string(containsString("7 / 20")))
+        .andExpect(content().string(containsString("6 saved")))
+        .andExpect(content().string(containsString("disabled")));
+  }
 
   @Test
   void emptyDetectionsPageClampsThePageAndExposesModelState() throws Exception {
+    when(imports.progress()).thenReturn(Optional.empty());
     when(service.count()).thenReturn(0L);
     when(service.page(1, 30)).thenReturn(List.of());
     when(service.isConfigured()).thenReturn(false);
