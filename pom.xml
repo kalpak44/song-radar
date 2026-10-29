@@ -241,7 +241,9 @@
                  each once rather than once per run. The test ffmpeg is the glibc build
                  because the tests run on the Ubuntu runner; the image ffmpeg is the musl
                  build because the base image is Alpine. Both archives also carry the
-                 libav* shared libraries the ffmpeg binary loads from its $ORIGIN. -->
+                 libav* shared libraries the ffmpeg binary loads from its $ORIGIN.
+                 Always unpack: unpackWhenChanged skips extraction when the ~/.m2 cache is
+                 unchanged, even after `clean` has removed the files it would have left. -->
             <plugin>
                 <groupId>com.googlecode.maven-download-plugin</groupId>
                 <artifactId>download-maven-plugin</artifactId>
@@ -272,7 +274,6 @@
                             <outputFileName>${ffmpeg.tests.asset}</outputFileName>
                             <sha256>${ffmpeg.tests.sha256}</sha256>
                             <unpack>true</unpack>
-                            <unpackWhenChanged>true</unpackWhenChanged>
                         </configuration>
                     </execution>
                     <execution>
@@ -287,7 +288,6 @@
                             <outputFileName>${ffmpeg.image.asset}</outputFileName>
                             <sha256>${ffmpeg.image.sha256}</sha256>
                             <unpack>true</unpack>
-                            <unpackWhenChanged>true</unpackWhenChanged>
                         </configuration>
                     </execution>
                 </executions>
