@@ -331,8 +331,10 @@
                         <!-- Rebuilt by its publisher after the current Alpine security
                              updates. The Temurin JRE image on the same Alpine release
                              lags those rebuilds, and the scan reports the difference as
-                             fixable Critical findings in OpenSSL and expat. -->
-                        <image>azul/zulu-openjdk-alpine:25-jre-headless</image>
+                             fixable Critical findings in OpenSSL and expat. Pin the
+                             Azul Java 25 patch build that carries the Alpine fix for
+                             CVE-2026-4738 (zlib 1.4-r0). -->
+                        <image>azul/zulu-openjdk-alpine:25.0.5.0.3-jre-headless</image>
                         <!-- Stated rather than inherited: the yt-dlp and ffmpeg binaries
                              below are amd64, so a build for another architecture would
                              produce an image whose YouTube source cannot start. -->
