@@ -395,6 +395,11 @@
                     </extraDirectories>
                     <container>
                         <mainClass>io.github.kalpak44.songradar.SongRadarApplication</mainClass>
+                        <!-- The Base64 intrinsic overflows the heap on AVX-512 CPUs
+                             (CVE-2026-114938). -->
+                        <jvmFlags>
+                            <jvmFlag>-XX:-UseBASE64Intrinsics</jvmFlag>
+                        </jvmFlags>
                         <ports>
                             <port>8080</port>
                         </ports>
